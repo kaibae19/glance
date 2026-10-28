@@ -1,7 +1,7 @@
 import os
 import threading
 
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango
 
 from . import markup
 
@@ -30,6 +30,10 @@ class GlanceWindow(Adw.ApplicationWindow):
     markup_bar = Gtk.Template.Child()
     swatches = Gtk.Template.Child()
     custom_color = Gtk.Template.Child()
+    text_controls = Gtk.Template.Child()
+    font_button = Gtk.Template.Child()
+    size_spin = Gtk.Template.Child()
+    weight_button = Gtk.Template.Child()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -45,7 +49,12 @@ class GlanceWindow(Adw.ApplicationWindow):
         drop.connect("drop", self._on_drop)
         self.add_controller(drop)
         self.canvas.connect("zoom-changed", lambda *_: self._update_title())
-        self.canvas.connect("selection-changed", lambda *_: self._update_state())
+        self.canvas.connect("selection-changed", lambda *_: (self._update_state(), self._sync_bar()))
+        self._syncing_bar = False
+        self._text_hint_shown = False
+        self.font_button.set_font_desc(Pango.FontDescription.from_string(markup.FONT))
+        self.font_button.connect("notify::font-desc", self._on_font)
+        self.size_spin.connect("value-changed", self._on_text_size)
         self.canvas.connect("shapes-changed", self._on_shapes_changed)
         self.canvas.connect("text-requested", self._on_text_requested)
         self._build_swatches()
@@ -120,16 +129,56 @@ class GlanceWindow(Adw.ApplicationWindow):
         self.canvas.tool = value.get_string()
         if not self.canvas.markup_enabled:
             self.activate_action("win.markup", None)
+        self._sync_bar()
 
     def _on_markup_color(self, action, value):
         action.set_state(value)
         self.canvas.markup_color = markup.hex_to_rgba(value.get_string())
-        self.canvas.restyle_selected()
+        if not self._syncing_bar:
+            self.canvas.restyle_selected(color=self.canvas.markup_color)
 
     def _on_markup_weight(self, action, value):
         action.set_state(value)
         self.canvas.markup_weight = value.get_string()
-        self.canvas.restyle_selected()
+        if not self._syncing_bar:
+            self.canvas.restyle_selected(width=self.canvas.style("rect")["width"])
+
+    def _on_font(self, button, _pspec):
+        if self._syncing_bar or button.get_font_desc() is None:
+            return
+        desc = button.get_font_desc().copy()
+        desc.unset_fields(Pango.FontMask.SIZE)  # the size comes from the size field
+        self.canvas.text_font = desc.to_string()
+        self.canvas.restyle_selected(font=self.canvas.text_font)
+
+    def _on_text_size(self, spin):
+        if self._syncing_bar:
+            return
+        self.canvas.text_size = spin.get_value()
+        self.canvas.restyle_selected(size=self.canvas.text_size)
+
+    def _sync_bar(self):
+        """Show the selected shape's style in the bar (so changing it there restyles that shape), and the
+        text controls while text is selected or the Text tool is on."""
+        canvas = self.canvas
+        shape = canvas.selected if canvas.markup_enabled else None
+        is_text = shape.kind == "text" if shape else canvas.tool == "text"
+        self.text_controls.set_visible(canvas.markup_enabled and is_text)
+        self.weight_button.set_visible(not is_text)
+        self._syncing_bar = True
+        try:
+            if shape:
+                self.change_action_state("markup-color", GLib.Variant("s", markup.rgba_to_hex(shape.color)))
+                if shape.kind == "text":
+                    canvas.text_font, canvas.text_size = shape.font, shape.size
+                else:
+                    weight = markup.nearest_weight(shape.width, canvas.image_size)
+                    self.change_action_state("markup-weight", GLib.Variant("s", weight))
+            if is_text:
+                self.font_button.set_font_desc(Pango.FontDescription.from_string(canvas.text_font))
+                self.size_spin.set_value(round(canvas.text_size or canvas.default_text_size()))
+        finally:
+            self._syncing_bar = False
 
     def _build_swatches(self):
         css = []
@@ -161,6 +210,11 @@ class GlanceWindow(Adw.ApplicationWindow):
         if not doc:
             return
         shapes = canvas.shapes
+        if (not self._text_hint_shown and canvas.selected and canvas.selected.kind == "text"
+                and not (doc.open_markup and canvas.selected in doc.open_markup.shapes)):
+            self._text_hint_shown = True
+            self.toast("Text stays editable: double-click to retype, drag a corner to resize; "
+                       "font, size and colour are in the bar")
         if doc.open_markup is not None:
             doc.amend(markup.Annotate(shapes) if shapes else None)
         elif shapes:
@@ -171,10 +225,19 @@ class GlanceWindow(Adw.ApplicationWindow):
         entry = Gtk.Entry(text=existing.text if existing else "", placeholder_text="Text", width_chars=28)
         popover = Gtk.Popover(child=entry, position=Gtk.PositionType.BOTTOM)
         popover.set_parent(canvas)
-        wx, wy = canvas.to_widget(x, y)
+        # Point at the text's bottom edge so the bubble sits under the text, which updates live as you type.
+        if existing:
+            r = markup.bbox(existing)
+        else:
+            size = canvas.style("text")["size"]
+            r = markup.bbox(markup.Shape("text", (x, y), (x, y), text="Text", size=size,
+                                         font=canvas.text_font))
+        x0, y0 = canvas.to_widget(r.x, r.y)
+        x1, y1 = canvas.to_widget(r.right, r.bottom)
         target = Gdk.Rectangle()
-        target.x, target.y, target.width, target.height = int(wx), int(wy), 1, 1
+        target.x, target.y, target.width, target.height = int(x0), int(y0), max(1, int(x1 - x0)), max(1, int(y1 - y0))
         popover.set_pointing_to(target)
+        entry.connect("changed", lambda e: canvas.preview_text(index, (x, y), e.get_text()))
         committed = []
 
         def commit(*_args):
@@ -286,6 +349,8 @@ class GlanceWindow(Adw.ApplicationWindow):
         self._siblings = imageio.sibling_images(path)
         self.canvas.set_image(doc.image)
         self.canvas.select_shape(None)
+        self.canvas.text_size = None  # back to this image's default
+        self._sync_bar()
         self.stack.set_visible_child_name("image")
         self.canvas.grab_focus()
         self._fill_info()

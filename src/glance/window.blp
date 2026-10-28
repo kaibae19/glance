@@ -154,7 +154,7 @@ template $GlanceWindow: Adw.ApplicationWindow {
           ToggleButton {
             focus-on-click: false;
             icon-name: "glance-tool-text-symbolic";
-            tooltip-text: _("Text");
+            tooltip-text: _("Text: click to type; double-click text to retype it");
             action-name: "win.markup-tool";
             action-target: "'text'";
           }
@@ -176,10 +176,41 @@ template $GlanceWindow: Adw.ApplicationWindow {
           };
         }
 
-        MenuButton {
+        Box text_controls {
+          spacing: 6;
+          visible: false;
+
+          FontDialogButton font_button {
+            focus-on-click: false;
+            valign: center;
+            level: face;
+            use-font: true;
+            tooltip-text: _("Font");
+
+            dialog: FontDialog {
+              title: _("Text Font");
+            };
+          }
+
+          SpinButton size_spin {
+            valign: center;
+            numeric: true;
+            tooltip-text: _("Text Size (px)");
+
+            adjustment: Adjustment {
+              lower: 4;
+              upper: 2000;
+              step-increment: 1;
+              page-increment: 10;
+              value: 32;
+            };
+          }
+        }
+
+        MenuButton weight_button {
           focus-on-click: false;
           icon-name: "glance-weight-symbolic";
-          tooltip-text: _("Line Width and Text Size");
+          tooltip-text: _("Line Width");
           menu-model: weight_menu;
         }
 

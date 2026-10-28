@@ -92,6 +92,8 @@ class Canvas(Gtk.Widget):
         self.tool = "select"
         self.markup_color = markup.hex_to_rgba(markup.PALETTE[0][1])
         self.markup_weight = "medium"
+        self.text_font = markup.FONT
+        self.text_size = None  # px; None = the image's default
         self.shapes = ()
         self.selected_shape = None
         self._live = None  # shapes while a markup drag is in progress
@@ -159,11 +161,22 @@ class Canvas(Gtk.Widget):
 
     # --- markup editing ---------------------------------------------------------------------------
 
+    def default_text_size(self):
+        return round(markup.base_stroke(self.image_size) * markup.TEXT_SIZES["medium"])
+
     def style(self, kind):
+        """The current style for a new shape of kind."""
+        if kind == "text":
+            return dict(color=self.markup_color, font=self.text_font,
+                        size=self.text_size or self.default_text_size())
         base = markup.base_stroke(self.image_size)
-        size = base * markup.TEXT_SIZES[self.markup_weight]
-        return dict(color=self.markup_color, width=base * markup.WIDTHS[self.markup_weight],
-                    **({"size": size} if kind == "text" else {}))
+        return dict(color=self.markup_color, width=base * markup.WIDTHS[self.markup_weight])
+
+    @property
+    def selected(self):
+        """The selected markup shape, or None."""
+        i = self.selected_shape
+        return self.shapes[i] if i is not None and i < len(self.shapes) else None
 
     def select_shape(self, index):
         if index != self.selected_shape:
@@ -183,20 +196,31 @@ class Canvas(Gtk.Widget):
         if self.selected_shape is not None:
             self._commit(self.shapes[:self.selected_shape] + self.shapes[self.selected_shape + 1:])
 
-    def restyle_selected(self):
-        """Give the selected shape the current colour and weight."""
+    def restyle_selected(self, **changes):
+        """Change the selected shape's style; fields that don't apply to its kind are ignored."""
         i = self.selected_shape
         if i is None:
             return
         old = self.shapes[i]
-        style = self.style(old.kind)
-        new = replace(old, **style)
+        allowed = ("color", "font", "size") if old.kind == "text" else ("color", "width")
+        new = replace(old, **{k: v for k, v in changes.items() if k in allowed})
         if new != old:
             self._commit(self.shapes[:i] + (new,) + self.shapes[i + 1:], select=i)
+
+    def preview_text(self, index, point, text):
+        """Show text live on the image while it is being typed (nothing is committed)."""
+        if index < 0:
+            shape = markup.Shape("text", tuple(point), tuple(point), text=text, **self.style("text"))
+            self._live = self.shapes + ((shape,) if text else ())
+        else:
+            self._live = self.shapes[:index] + (replace(self.shapes[index], text=text),) + self.shapes[index + 1:]
+        self.queue_draw()
 
     def commit_text(self, index, point, text):
         """From the text editor: add (index -1), change or (empty text) delete a text shape."""
         text = text.rstrip()
+        self._live = None
+        self.queue_draw()
         if index < 0:
             if text:
                 shape = markup.Shape("text", tuple(point), tuple(point), text=text, **self.style("text"))
