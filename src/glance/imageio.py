@@ -227,13 +227,17 @@ def export(img, path, info, options, dpi=None):
 
 
 def _write(out, path, fmt, params):
-    """Save atomically: a temp file in the same folder, then rename over path."""
+    write_atomic(path, lambda f: out.save(f, format=fmt, **params))
+
+
+def write_atomic(path, write):
+    """Call write(file) on a temp file in path's folder, then rename it over path (keeping its mode)."""
     path = os.path.abspath(path)
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".glance-",
                                suffix=os.path.splitext(path)[1])
     try:
         with os.fdopen(fd, "wb") as f:
-            out.save(f, format=fmt, **params)
+            write(f)
         if os.path.exists(path):
             shutil.copymode(path, tmp)
         else:
