@@ -1,0 +1,15 @@
+#!/bin/sh
+# Run a command against a throwaway headless GNOME Shell (no login needed).
+# Usage: scripts/headless-run CMD [ARG…]
+set -e
+export XDG_RUNTIME_DIR=$(mktemp -d)
+trap 'rm -rf "$XDG_RUNTIME_DIR"' EXIT
+dbus-run-session -- sh -c '
+  gnome-shell --headless --wayland --no-x11 --virtual-monitor 1280x800 --wayland-display glance-wl \
+    >"$XDG_RUNTIME_DIR/shell.log" 2>&1 &
+  for i in $(seq 50); do [ -S "$XDG_RUNTIME_DIR/glance-wl" ] && break; sleep 0.2; done
+  rc=0
+  WAYLAND_DISPLAY=glance-wl GDK_BACKEND=wayland timeout 60 "$@" || rc=$?
+  kill %1
+  exit $rc
+' sh "$@"
