@@ -19,7 +19,7 @@ import gi  # noqa: E402
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
+from gi.repository import Adw, Gio, GLib, Graphene, Gtk  # noqa: E402
 from PIL import Image  # noqa: E402
 
 Gio.Resource.load(os.path.join(pkgdatadir, "glance.gresource"))._register()
@@ -447,6 +447,12 @@ def pdf_view(win):
     ok = (win.stack.get_visible_child_name() == "pdf" and len(pdf) == 4 and 0.65 < view.zoom < 0.75
           and not win.lookup_action("markup").get_enabled())
     shoot(win, "pdf.png")
+    hadj = view.pages_scroll.get_hadjustment()
+    first = next(w for w in view._bound_pages if w.position == 0 and w.get_mapped())
+    ok_x, pt = first.compute_point(view.pages_scroll, Graphene.Point().init(0, 0))
+    left, right = pt.x, view.pages_scroll.get_width() - (pt.x + first.get_width())
+    step(f"page 1 in the view: {left:.0f} px left, {right:.0f} px right (hscroll {hadj.get_value():.0f}/{hadj.get_upper():.0f})")
+    ok = ok and abs(left - right) <= 20
     view.go_to(2)
     step(f"go to page 3 -> current {view.current_page + 1}, subtitle {win.window_title.get_subtitle()!r}")
     ok = ok and view.current_page == 2

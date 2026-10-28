@@ -183,6 +183,11 @@ class PdfView(Gtk.Box):
                                   css_classes=["glance-pdf-pages"], hexpand=True, vexpand=True)
         self.pages_scroll = Gtk.ScrolledWindow(child=self.pages, hexpand=True, vexpand=True)
         self.pages_scroll.get_vadjustment().connect("value-changed", lambda *_: self._track_page())
+        # The list is as wide as its widest page and centres the rest in that width; keep the sideways scroll
+        # centred too, so common-width pages sit in the middle and a wider one overhangs both sides.
+        hadj = self.pages_scroll.get_hadjustment()
+        hadj.connect("notify::upper", self._centre_horizontally)
+        hadj.connect("notify::page-size", self._centre_horizontally)
         zoom_keys = Gtk.EventControllerScroll.new(Gtk.EventControllerScrollFlags.VERTICAL)
         zoom_keys.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         zoom_keys.connect("scroll", self._on_scroll)
@@ -274,6 +279,9 @@ class PdfView(Gtk.Box):
         Gtk.Box.do_size_allocate(self, width, height, baseline)
         if self.fit_width:
             GLib.idle_add(self._apply_fit)
+
+    def _centre_horizontally(self, hadj, _pspec):
+        hadj.set_value(max(0.0, (hadj.get_upper() - hadj.get_page_size()) / 2))
 
     def go_to(self, position, select=True):
         if not self.document or not 0 <= position < len(self.document):
