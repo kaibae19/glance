@@ -7,9 +7,9 @@ from . import imageio
 from .adjust_size import AdjustSizeDialog
 from .canvas import Canvas  # noqa: F401  registers GlanceCanvas for the template
 from .document import AnimatedImageError, Document
-from .ops import Flip, Rotate
+from .ops import Crop, Flip, Rotate
 
-DOC_ACTIONS = ["save", "save-as", "adjust-size", "zoom-in", "zoom-out", "zoom-actual", "zoom-fit", "rotate-left",
+DOC_ACTIONS = ["save", "save-as", "adjust-size", "crop", "select-all", "zoom-in", "zoom-out", "zoom-actual", "zoom-fit", "rotate-left",
                "rotate-right", "flip-horizontal", "flip-vertical", "previous", "next", "info"]
 
 
@@ -37,6 +37,7 @@ class GlanceWindow(Adw.ApplicationWindow):
         drop.connect("drop", self._on_drop)
         self.add_controller(drop)
         self.canvas.connect("zoom-changed", lambda *_: self._update_title())
+        self.canvas.connect("selection-changed", lambda *_: self._update_state())
         self.connect("close-request", self._on_close_request)
         self._update_state()
 
@@ -48,6 +49,8 @@ class GlanceWindow(Adw.ApplicationWindow):
             "save": self.on_save,
             "save-as": self.on_save_as,
             "adjust-size": self.on_adjust_size,
+            "crop": self.on_crop,
+            "select-all": self.canvas.select_all,
             "close": self.close,
             "undo": lambda: self.document and self.document.undo(),
             "redo": lambda: self.document and self.document.redo(),
@@ -69,6 +72,15 @@ class GlanceWindow(Adw.ApplicationWindow):
             action.connect("activate", lambda _a, _p, h=handler: h())
             self.add_action(action)
 
+        ratio = Gio.SimpleAction.new_stateful("selection-ratio", GLib.VariantType.new("s"),
+                                              GLib.Variant("s", "free"))
+        ratio.connect("change-state", self._on_ratio)
+        self.add_action(ratio)
+
+    def _on_ratio(self, action, value):
+        action.set_state(value)
+        self.canvas.set_ratio(value.get_string())
+
     def _enable(self, name, enabled):
         self.lookup_action(name).set_enabled(enabled)
 
@@ -77,6 +89,7 @@ class GlanceWindow(Adw.ApplicationWindow):
         for name in DOC_ACTIONS:
             self._enable(name, doc is not None)
         self._enable("save", bool(doc and doc.dirty))
+        self._enable("crop", bool(doc and self.canvas.selection))
         self._enable("undo", bool(doc and doc.can_undo))
         self._enable("redo", bool(doc and doc.can_redo))
         index = self._sibling_index()
@@ -97,7 +110,11 @@ class GlanceWindow(Adw.ApplicationWindow):
         w, h = doc.size
         self.set_title(title)
         self.window_title.set_title(title)
-        self.window_title.set_subtitle(f"{w} × {h} px · {round(self.canvas.zoom * 100)}%")
+        subtitle = f"{w} × {h} px · {round(self.canvas.zoom * 100)}%"
+        if self.canvas.selection:
+            sw, sh = self.canvas.selection.pixel_size(doc.size)
+            subtitle += f" · selection {sw} × {sh}"
+        self.window_title.set_subtitle(subtitle)
 
     def toast(self, text):
         self.toast_overlay.add_toast(Adw.Toast(title=text))
@@ -185,6 +202,16 @@ class GlanceWindow(Adw.ApplicationWindow):
     def _apply(self, op):
         if self.document:
             self.document.apply(op)
+
+    def on_crop(self):
+        doc, rect = self.document, self.canvas.selection
+        if not doc or not rect:
+            return
+        box = rect.box(doc.size)
+        if box == (0, 0, *doc.size):
+            self.canvas.set_selection(None)  # cropping to everything changes nothing
+        else:
+            doc.apply(Crop(box))
 
     def on_adjust_size(self):
         if self.document:

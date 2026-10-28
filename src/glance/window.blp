@@ -119,6 +119,42 @@ menu primary_menu {
 
   section {
     item (_("Ad_just Size…"), "win.adjust-size")
+    item (_("_Crop to Selection"), "win.crop")
+    item (_("Select _All"), "win.select-all")
+
+    submenu {
+      label: _("Selection _Ratio");
+
+      item {
+        label: _("Free");
+        action: "win.selection-ratio";
+        target: "free";
+      }
+
+      item {
+        label: _("Original");
+        action: "win.selection-ratio";
+        target: "original";
+      }
+
+      item {
+        label: _("1:1 (Square)");
+        action: "win.selection-ratio";
+        target: "1:1";
+      }
+
+      item {
+        label: _("4:3");
+        action: "win.selection-ratio";
+        target: "4:3";
+      }
+
+      item {
+        label: _("16:9");
+        action: "win.selection-ratio";
+        target: "16:9";
+      }
+    }
   }
 
   section {

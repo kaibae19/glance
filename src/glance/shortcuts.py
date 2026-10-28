@@ -13,6 +13,8 @@ SHORTCUTS = {
     "win.zoom-out": ["<Control>minus", "<Control>KP_Subtract"],
     "win.zoom-actual": ["<Control>0", "<Control>KP_0"],
     "win.zoom-fit": ["<Control>9"],
+    "win.crop": ["<Control>k"],  # Preview: Crop
+    "win.select-all": ["<Control>a"],
     "win.adjust-size": ["<Control><Alt>i"],  # Preview has none by default (design doc §6)
     "win.rotate-left": ["<Control>l"],
     "win.rotate-right": ["<Control>r"],
