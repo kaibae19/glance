@@ -6,7 +6,8 @@ py = import('python').find_installation('python3')
 pkgdatadir = get_option('prefix') / get_option('datadir') / meson.project_name()
 
 subdir('data')
-subdir('src')
+subdir('src/glance')
+subdir('bin')
 
 test('unit', py, args: ['-m', 'pytest', '-q', meson.project_source_root() / 'tests'],
      workdir: meson.project_source_root())
