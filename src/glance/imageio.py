@@ -93,16 +93,17 @@ def format_size(n):
         n /= 1000
 
 
-def describe(path, img, info):
-    """Rows for the Info popover: [(label, value)]."""
+def describe(path, img, info, dpi=None):
+    """Rows for the Info popover: [(label, value)]. dpi overrides the file's (after Adjust Size)."""
+    dpi = dpi or info.dpi
     w, h = img.size
     rows = [("Name", os.path.basename(path)), ("Dimensions", f"{w} × {h} px")]
     rows.append(("Format", f"{info.format or 'unknown'} ({info.mode})"))
     rows.append(("File size", format_size(info.file_size)))
     if info.animated:
         rows.append(("Frames", f"{info.n_frames} (showing the first)"))
-    if info.dpi:
-        rows.append(("Resolution", f"{round(info.dpi[0])} × {round(info.dpi[1])} dpi"))
+    if dpi:
+        rows.append(("Resolution", f"{round(dpi[0])} × {round(dpi[1])} dpi"))
     if info.icc_profile:
         try:
             name = ImageCms.getProfileDescription(ImageCms.ImageCmsProfile(io.BytesIO(info.icc_profile)))
@@ -119,27 +120,46 @@ def describe(path, img, info):
     return rows
 
 
-def save(img, path, info, fmt=None):
-    """Write img to path atomically (temp file in the same folder, then rename).
-
-    Keeps the ICC profile, EXIF (orientation already reset) and DPI from info. Returns the format written.
-    """
-    fmt = fmt or format_for_path(path) or (info.format if info else None)
-    if fmt is None:
-        raise ValueError(f"no image format for {os.path.basename(path)}")
+def _prepare(img, info, fmt, dpi=None):
+    """The image and Image.save() parameters for writing img as fmt."""
     out = img
     if fmt in NO_ALPHA and img.mode == "RGBA":
         out = Image.new("RGB", img.size, "white")
         out.paste(img, mask=img.getchannel("A"))
     params = {}
+    dpi = dpi or (info.dpi if info else None)
     if info and info.icc_profile:
         params["icc_profile"] = info.icc_profile
     if info and info.exif and fmt in ("JPEG", "PNG", "WEBP", "TIFF"):
         params["exif"] = info.exif.tobytes()
-    if info and info.dpi and fmt in ("JPEG", "PNG", "TIFF", "BMP"):
-        params["dpi"] = info.dpi
+    if dpi and fmt in ("JPEG", "PNG", "TIFF", "BMP"):
+        params["dpi"] = dpi
     if fmt == "JPEG":
         params["quality"] = 95
+    return out, params
+
+
+def encoded_size(img, info, fmt=None, dpi=None):
+    """Bytes img would take on disk as fmt (default: the file's own format), or None if unknown."""
+    fmt = fmt or (info.format if info else None)
+    if fmt not in Image.SAVE:
+        return None
+    out, params = _prepare(img, info, fmt, dpi)
+    buf = io.BytesIO()
+    out.save(buf, format=fmt, **params)
+    return buf.tell()
+
+
+def save(img, path, info, fmt=None, dpi=None):
+    """Write img to path atomically (temp file in the same folder, then rename).
+
+    Keeps the ICC profile, EXIF (orientation already reset) and DPI (dpi, else the file's). Returns the
+    format written.
+    """
+    fmt = fmt or format_for_path(path) or (info.format if info else None)
+    if fmt is None:
+        raise ValueError(f"no image format for {os.path.basename(path)}")
+    out, params = _prepare(img, info, fmt, dpi)
 
     path = os.path.abspath(path)
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".glance-",

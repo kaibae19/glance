@@ -4,11 +4,12 @@ import threading
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 from . import imageio
+from .adjust_size import AdjustSizeDialog
 from .canvas import Canvas  # noqa: F401  registers GlanceCanvas for the template
 from .document import AnimatedImageError, Document
 from .ops import Flip, Rotate
 
-DOC_ACTIONS = ["save", "save-as", "zoom-in", "zoom-out", "zoom-actual", "zoom-fit", "rotate-left",
+DOC_ACTIONS = ["save", "save-as", "adjust-size", "zoom-in", "zoom-out", "zoom-actual", "zoom-fit", "rotate-left",
                "rotate-right", "flip-horizontal", "flip-vertical", "previous", "next", "info"]
 
 
@@ -46,6 +47,7 @@ class GlanceWindow(Adw.ApplicationWindow):
             "open": self.on_open,
             "save": self.on_save,
             "save-as": self.on_save_as,
+            "adjust-size": self.on_adjust_size,
             "close": self.close,
             "undo": lambda: self.document and self.document.undo(),
             "redo": lambda: self.document and self.document.redo(),
@@ -184,6 +186,10 @@ class GlanceWindow(Adw.ApplicationWindow):
         if self.document:
             self.document.apply(op)
 
+    def on_adjust_size(self):
+        if self.document:
+            AdjustSizeDialog(self.document, self._apply).present(self)
+
     def _on_document_changed(self, doc):
         self.canvas.set_image(doc.image, reset=False)
         self._fill_info()
@@ -195,7 +201,7 @@ class GlanceWindow(Adw.ApplicationWindow):
         doc = self.document
         if not doc:
             return
-        for row, (label, value) in enumerate(imageio.describe(doc.path, doc.image, doc.info)):
+        for row, (label, value) in enumerate(imageio.describe(doc.path, doc.image, doc.info, doc.dpi)):
             key = Gtk.Label(label=label, xalign=1, css_classes=["dim-label"])
             val = Gtk.Label(label=value, xalign=0, selectable=True, wrap=True, max_width_chars=40)
             self.info_grid.attach(key, 0, row, 1, 1)

@@ -1,6 +1,6 @@
 blueprints = custom_target('blueprints',
-  input: files('window.blp'),
-  output: ['window.ui'],
+  input: files('adjust_size.blp', 'window.blp'),
+  output: ['adjust_size.ui', 'window.ui'],
   command: [find_program('blueprint-compiler'), 'batch-compile', '@OUTDIR@', '@CURRENT_SOURCE_DIR@', '@INPUT@'],
 )
 
@@ -12,7 +12,7 @@ gnome.compile_resources('glance', 'glance.gresource.xml',
 )
 
 install_data(
-  files('__init__.py', 'canvas.py', 'document.py', 'imageio.py', 'main.py', 'ops.py',
-        'shortcuts.py', 'window.py'),
+  files('__init__.py', 'adjust_size.py', 'canvas.py', 'document.py', 'imageio.py', 'main.py', 'ops.py',
+        'shortcuts.py', 'sizing.py', 'window.py'),
   install_dir: pkgdatadir / 'glance',
 )

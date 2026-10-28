@@ -144,3 +144,32 @@ def test_describe(tmp_path):
     assert rows["Dimensions"] == "400 × 300 px"
     assert rows["Format"] == "PNG (RGBA)"
     assert rows["Resolution"] == "144 × 144 dpi"
+
+
+def test_resize_and_resolution_saved(tmp_path):
+    from glance.ops import Resize
+    path = png(tmp_path, size=(1024, 1024), dpi=(72, 72))
+    doc = Document.open(path)
+    doc.apply(Resize((400, 400), dpi=(144.0, 144.0)))
+    assert doc.size == (400, 400) and doc.dpi == (144.0, 144.0)
+    doc.save()
+    with Image.open(path) as img:
+        assert img.size == (400, 400)
+        assert round(img.info["dpi"][0]) == 144
+    doc.undo()
+    assert doc.dpi == (72, 72) or round(doc.dpi[0]) == 72
+
+
+def test_resolution_only_keeps_pixels(tmp_path):
+    from glance.ops import Resize
+    doc = Document.open(png(tmp_path, size=(10, 10)))
+    before = doc.image
+    doc.apply(Resize((10, 10), dpi=(300.0, 300.0)))
+    assert doc.image is before and doc.dirty
+
+
+def test_encoded_size_estimate(tmp_path):
+    img, info = imageio.load(png(tmp_path, size=(200, 100)))
+    estimate = imageio.encoded_size(img, info)
+    assert estimate and abs(estimate - info.file_size) < 200
+    assert imageio.encoded_size(img, info, "JPEG") > 0

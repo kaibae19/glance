@@ -41,6 +41,14 @@ class Document:
         return self.image.size
 
     @property
+    def dpi(self):
+        """Resolution after the ops: the last Resize that set one, else the file's."""
+        for op in reversed(self.ops):
+            if getattr(op, "dpi", None):
+                return op.dpi
+        return self.info.dpi if self.info else None
+
+    @property
     def dirty(self):
         return tuple(self.ops) != self._saved_ops
 
@@ -78,7 +86,7 @@ class Document:
             raise ValueError("document has no path")
         if self.info and self.info.animated:
             raise AnimatedImageError(target)
-        fmt = imageio.save(self.image, target, self.info)
+        fmt = imageio.save(self.image, target, self.info, dpi=self.dpi)
         if self.info:
             self.info.format = fmt
         self.path = target

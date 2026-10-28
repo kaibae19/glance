@@ -1,0 +1,108 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $GlanceAdjustSizeDialog: Adw.Dialog {
+  title: _("Adjust Size");
+  content-width: 440;
+  focus-widget: width_row;
+  default-widget: resize_button;
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      show-start-title-buttons: false;
+      show-end-title-buttons: false;
+
+      [start]
+      Button {
+        label: _("Cancel");
+        clicked => $on_cancel();
+      }
+
+      [end]
+      Button resize_button {
+        label: _("Resize");
+        clicked => $on_apply();
+
+        styles [
+          "suggested-action",
+        ]
+      }
+    }
+
+    content: Adw.PreferencesPage {
+      Adw.PreferencesGroup {
+        Adw.ComboRow fit_row {
+          title: _("Fit Into");
+        }
+
+        Adw.SpinRow width_row {
+          title: _("Width");
+
+          adjustment: Adjustment {
+            lower: 0;
+            upper: 1000000;
+            step-increment: 1;
+            page-increment: 10;
+          };
+        }
+
+        Adw.SpinRow height_row {
+          title: _("Height");
+
+          adjustment: Adjustment {
+            lower: 0;
+            upper: 1000000;
+            step-increment: 1;
+            page-increment: 10;
+          };
+        }
+
+        Adw.ComboRow unit_row {
+          title: _("Units");
+        }
+
+        Adw.SwitchRow proportional_row {
+          title: _("Scale Proportionally");
+          active: true;
+        }
+      }
+
+      Adw.PreferencesGroup {
+        Adw.SpinRow resolution_row {
+          title: _("Resolution");
+          subtitle: _("pixels/inch");
+          digits: 0;
+
+          adjustment: Adjustment {
+            lower: 1;
+            upper: 100000;
+            step-increment: 1;
+            page-increment: 10;
+          };
+        }
+
+        Adw.SwitchRow resample_row {
+          title: _("Resample Image");
+          subtitle: _("Off: change only the resolution, keep every pixel");
+          active: true;
+        }
+
+        Adw.ComboRow method_row {
+          title: _("Method");
+        }
+      }
+
+      Adw.PreferencesGroup {
+        Adw.ActionRow result_row {
+          title: _("Resulting Size");
+          subtitle-selectable: true;
+
+          styles [
+            "property",
+          ]
+        }
+      }
+    };
+  };
+}

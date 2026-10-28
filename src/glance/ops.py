@@ -39,8 +39,10 @@ class Crop(Op):
 
 @dataclass(frozen=True)
 class Resize(Op):
+    """Adjust Size: new pixel size and/or new resolution (dpi None = unchanged)."""
     size: tuple[int, int]
     resample: Image.Resampling = Image.Resampling.LANCZOS
+    dpi: tuple[float, float] | None = None
 
     def apply(self, img):
-        return img.resize(self.size, self.resample)
+        return img if img.size == tuple(self.size) else img.resize(self.size, self.resample)
