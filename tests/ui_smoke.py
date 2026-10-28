@@ -91,6 +91,9 @@ def focused_in(widget, root):
 
 def estimated(win, dialog):
     step(f"result: {dialog.result_row.get_subtitle()}; focus in width: {focused_in(dialog.width_row, win)}")
+    if "about 6.5 kB" in dialog.result_row.get_subtitle():
+        step("FAIL: estimate is the unresized file's")
+        result["stale_estimate"] = True
     shoot(win, "adjust-size.png")
     dialog.on_apply()  # what Enter does
     wait(lambda: win.document.size == (400, 400), lambda: resized(win))
@@ -106,13 +109,14 @@ def replace(win):
     confirm = win.get_visible_dialog()
     step(f"confirm: {confirm.get_heading()!r}")
     confirm.emit("response", "replace")
+    confirm.force_close()  # a click closes it; an emitted response doesn't
     wait(lambda: not win.document.dirty, lambda: saved(win))
 
 
 def saved(win):
     with Image.open(icon) as img:
         step(f"saved; file now {img.size} {img.mode}; title {win.get_title()!r}")
-        result["ok"] = img.size == (400, 400)
+        result["ok"] = img.size == (400, 400) and not result.get("stale_estimate")
     shoot(win, "after-save.png")
     win.open_file(Gio.File.new_for_path(photo))
     wait(lambda: win.document and win.document.size == (1600, 1000), lambda: crop_start(win))

@@ -136,6 +136,7 @@ class AdjustSizeDialog(Adw.Dialog):
     def _update_result(self):
         w, h = self.model.size()
         self.result_row.set_subtitle(f"{w} × {h} px")
+        self._estimate_seq += 1  # an estimate still running is for the old settings
         if self._estimate_timer:
             GLib.source_remove(self._estimate_timer)
         self._estimate_timer = GLib.timeout_add(ESTIMATE_DELAY_MS, self._start_estimate)
