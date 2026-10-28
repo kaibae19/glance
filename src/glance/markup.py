@@ -31,6 +31,19 @@ WIDTHS = {"thin": 1, "medium": 2, "thick": 4}  # × the image's base stroke
 TEXT_SIZES = {"thin": 7, "medium": 10, "thick": 16}  # × the base stroke, in px
 
 
+TEXT_HANDLES = ("nw", "ne", "se", "sw")
+
+
+def rgba_to_hex(rgba):
+    return "#" + "".join(f"{round(c * 255):02x}" for c in rgba[:3])
+
+
+def nearest_weight(width, size):
+    """The WIDTHS key closest to a stroke width on an image of size."""
+    ratio = width / base_stroke(size)
+    return min(WIDTHS, key=lambda k: abs(WIDTHS[k] - ratio))
+
+
 def hex_to_rgba(spec):
     spec = spec.lstrip("#")
     return tuple(int(spec[i:i + 2], 16) / 255 for i in (0, 2, 4)) + (1.0,)
@@ -50,6 +63,7 @@ class Shape:
     width: float = 4.0
     text: str = ""
     size: float = 32.0  # text height in px
+    font: str = FONT  # Pango family and style, e.g. "Cantarell Bold"; no size
 
     def moved(self, dx, dy):
         return replace(self, p0=(self.p0[0] + dx, self.p0[1] + dy), p1=(self.p1[0] + dx, self.p1[1] + dy))
@@ -83,7 +97,7 @@ def _layout(cr, shape):
     options.set_hint_style(cairo.HINT_STYLE_NONE)
     options.set_hint_metrics(cairo.HINT_METRICS_OFF)
     PangoCairo.context_set_font_options(layout.get_context(), options)
-    font = Pango.FontDescription.from_string(FONT)
+    font = Pango.FontDescription.from_string(shape.font or FONT)
     font.set_absolute_size(shape.size * Pango.SCALE)
     layout.set_font_description(font)
     layout.set_text(shape.text or " ", -1)
@@ -206,18 +220,23 @@ def shape_at(shapes, point, tolerance):
 
 
 def handles(shape):
-    """{name: (x, y)}: endpoints for lines and arrows, the box handles for box kinds, none for text."""
+    """{name: (x, y)}: endpoints for lines and arrows, corners for text (they scale it), all eight for boxes."""
     if shape.kind in ("line", "arrow"):
         return {"p0": shape.p0, "p1": shape.p1}
-    if shape.kind == "text":
-        return {}
     r = bbox(shape)
+    if shape.kind == "text":
+        return {h: sel.handle_point(r, h) for h in TEXT_HANDLES}
     return {h: sel.handle_point(r, h) for h in sel.HANDLES}
 
 
 def resized(shape, handle, point, bounds):
     if handle in ("p0", "p1"):
         return replace(shape, **{handle: point})
+    if shape.kind == "text":  # a corner scales the text, the opposite corner stays put
+        r = bbox(shape)
+        new = sel.resize(r, handle, point, bounds, r.w / r.h if r.h else None)
+        scale = new.h / r.h if r.h else 1.0
+        return replace(shape, p0=(new.x, new.y), p1=(new.x, new.y), size=max(4.0, shape.size * scale))
     r = sel.resize(bbox(shape), handle, point, bounds)
     return replace(shape, p0=(r.x, r.y), p1=(r.right, r.bottom))
 

@@ -105,3 +105,23 @@ def test_markup_saved_flattened(tmp_path):
     doc.save()
     with Image.open(path) as img:
         assert img.convert("RGB").getpixel((10, 50)) == (255, 0, 0)
+
+
+def test_font_changes_layout():
+    sans = Shape("text", (0, 0), (0, 0), text="Wide words", size=30, font="Sans")
+    mono = markup.replace(sans, font="Monospace")
+    assert markup.text_extent(sans) != markup.text_extent(mono)
+
+
+def test_text_corner_scales_size():
+    shape = Shape("text", (10, 10), (10, 10), text="Hi", size=20)
+    r = markup.bbox(shape)
+    bigger = markup.resized(shape, "se", (r.right + r.w, r.bottom + r.h), (1000, 1000))
+    assert bigger.size == pytest.approx(40, rel=0.05)
+    assert bigger.p0 == pytest.approx((10, 10))
+    assert set(markup.handles(shape)) == {"nw", "ne", "se", "sw"}
+
+
+def test_style_helpers():
+    assert markup.rgba_to_hex((1, 0.5, 0, 1)) == "#ff8000"
+    assert markup.nearest_weight(markup.base_stroke((1600, 1000)) * 4, (1600, 1000)) == "thick"
