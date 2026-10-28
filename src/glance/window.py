@@ -523,9 +523,10 @@ class GlanceWindow(Adw.ApplicationWindow):
 
     def _rotate(self, turns):
         if self.pdf:
-            targets = self.pdf_view.target_positions()
+            selected = self.pdf_view.selected_positions()  # read before the edit reloads the list
+            targets = selected or self.pdf_view.target_positions()
             self.pdf.rotate(targets, turns)
-            self.pdf_view.reload(select=self.pdf_view.selected_positions() and targets)
+            self.pdf_view.reload(select=selected)
         else:
             self._apply(Rotate(turns))
 

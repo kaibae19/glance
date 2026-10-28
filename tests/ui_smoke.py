@@ -25,6 +25,7 @@ from PIL import Image  # noqa: E402
 Gio.Resource.load(os.path.join(pkgdatadir, "glance.gresource"))._register()
 from glance import markup as glance_markup  # noqa: E402
 from glance.main import GlanceApplication  # noqa: E402
+from glance.window import GlanceWindow  # noqa: E402
 
 icon = os.path.join(workdir, "icon.png")
 Image.new("RGBA", (1024, 1024), (30, 140, 90, 255)).save(icon)
@@ -33,6 +34,8 @@ _img = Image.new("RGB", (1600, 1000), (60, 110, 170))
 for _x in range(0, 1600, 100):
     _img.paste((230, 190, 60), (_x, 0, _x + 50, 1000))
 _img.save(photo)
+report = os.path.join(workdir, "report.pdf")
+appendix = os.path.join(workdir, "appendix.pdf")
 shot = os.path.join(workdir, "shot.png")
 Image.new("RGB", (800, 500), "white").save(shot)
 logo = os.path.join(workdir, "logo.png")
@@ -401,9 +404,84 @@ def v1_done(win):
     w, h = app.settings.get_int("window-width"), app.settings.get_int("window-height")
     step(f"window size saved {w}×{h}")
     result["ok"] = result["ok"] and ok and result.pop("v1_ok") and (w, h) == (1000, 700) and result.pop("fit_ok")
+    pdf_start()
+
+
+# --- PDF ---------------------------------------------------------------------------------------
+
+def make_pdf(path, sizes, label):
+    import cairo
+    surface = cairo.PDFSurface(path, *sizes[0])
+    cr = cairo.Context(surface)
+    for i, size in enumerate(sizes):
+        surface.set_size(*size)
+        cr.set_source_rgb(0.2, 0.3, 0.7)
+        cr.rectangle(20, 20, size[0] - 40, 60)
+        cr.fill()
+        cr.set_source_rgb(0, 0, 0)
+        cr.set_font_size(28)
+        cr.move_to(30, 130)
+        cr.show_text(f"{label}{i}")
+        cr.show_page()
+    surface.finish()
+
+
+def pdf_texts(path):
+    import pypdf
+    reader = pypdf.PdfReader(path)
+    return [p.extract_text().strip() for p in reader.pages], [p.rotation for p in reader.pages]
+
+
+def pdf_start():
+    win = GlanceWindow(application=app)
+    win.open_file(Gio.File.new_for_path(report), present=True)
+    wait(lambda: win.pdf is not None and win.get_mapped(), lambda: GLib.timeout_add(400, lambda: pdf_view(win)))
+
+
+def pdf_view(win):
+    view, pdf = win.pdf_view, win.pdf
+    step(f"PDF open: page {win.stack.get_visible_child_name()}, {len(pdf)} pages, window {win.get_width()}×{win.get_height()}, "
+         f"zoom {view.zoom:.2f}, subtitle {win.window_title.get_subtitle()!r}; "
+         f"markup enabled {win.lookup_action('markup').get_enabled()}, crop {win.lookup_action('crop').get_enabled()}")
+    ok = (win.stack.get_visible_child_name() == "pdf" and len(pdf) == 4 and view.zoom > 0.5
+          and not win.lookup_action("markup").get_enabled())
+    shoot(win, "pdf.png")
+    view.go_to(2)
+    step(f"go to page 3 -> current {view.current_page + 1}, subtitle {win.window_title.get_subtitle()!r}")
+    ok = ok and view.current_page == 2
+    view.selection.select_item(0, True)
+    win.activate_action("win.rotate-right", None)
+    step(f"rotate page 1 -> turns {[p.turns for p in pdf.pages]}, still selected {view.selected_positions()}")
+    ok = ok and pdf.pages[0].turns == 1 and view.selected_positions() == [0]
+    view.move_pages([3], 0)  # what dragging the last thumbnail to the top does
+    step(f"drag page 4 to the top -> order {[p.index for p in pdf.pages]}, selected {view.selected_positions()}")
+    ok = ok and [p.index for p in pdf.pages] == [3, 0, 1, 2] and view.selected_positions() == [0]
+    win.insert_pdfs([appendix, logo], 2)  # a drop of two files: one PDF, one PNG
+    step(f"insert appendix at 3 -> {len(pdf)} pages, sources {[os.path.basename(p.source)[0] for p in pdf.pages]}")
+    ok = ok and len(pdf) == 6 and os.path.basename(pdf.pages[2].source) == "appendix.pdf"
+    view.selection.unselect_all()
+    view.selection.select_range(4, 2, True)
+    win.activate_action("win.delete-pages", None)
+    step(f"delete pages 5–6 -> {len(pdf)} pages; can undo {pdf.can_undo}")
+    ok = ok and len(pdf) == 4
+    win.activate_action("win.undo", None)
+    step(f"undo -> {len(pdf)} pages; title {win.get_title()!r}")
+    ok = ok and len(pdf) == 6 and win.get_title().endswith("Edited")
+    win.activate_action("win.delete-pages", None)
+    target = os.path.join(workdir, "report-edited.pdf")
+    win._save_to(target, None)  # what Save As leads to
+    texts, rotations = pdf_texts(target)
+    step(f"saved {os.path.basename(target)}: {texts}, rotations {rotations}; title {win.get_title()!r}")
+    ok = (ok and texts == ["r3", "r0", "a0", "a1"] and rotations == [0, 90, 0, 0]
+          and win.get_title() == "report-edited.pdf" and pdf_texts(report)[0] == ["r0", "r1", "r2", "r3"])
+    shoot(win, "pdf-edited.png")
+    result["ok"] = result["ok"] and ok
+    win.close()
     app.quit()
 
 
+make_pdf(report, [(595, 842)] * 3 + [(842, 595)], "r")  # A4 portrait ×3, then landscape
+make_pdf(appendix, [(400, 300)] * 2, "a")
 t0 = time.monotonic()
 app.connect("activate", lambda *_: GLib.idle_add(run))
 app.run([])
