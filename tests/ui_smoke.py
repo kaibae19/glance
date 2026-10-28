@@ -223,7 +223,7 @@ def export_go(win, dialog):
     shoot(win, "export-sheet.png")
     options = dialog.options()
     dialog.close()
-    win.get_application().export_defaults = options
+    win.remember_export(options)  # what choosing Export… does before the file chooser
     target = os.path.join(workdir, "logo-export.jpg")
     win._export(target, options)  # what the file chooser's answer leads to
     wait(lambda: os.path.exists(target), lambda: exported(win, target, options))

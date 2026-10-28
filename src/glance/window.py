@@ -487,9 +487,12 @@ class GlanceWindow(Adw.ApplicationWindow):
             defaults = getattr(app, "export_defaults", None) or settings.load_export(self._settings)
             ExportDialog(self.document, defaults, self._choose_export_path).present(self)
 
-    def _choose_export_path(self, options):
+    def remember_export(self, options):
         self.get_application().export_defaults = options
         settings.save_export(self._settings, options)
+
+    def _choose_export_path(self, options):
+        self.remember_export(options)
         doc = self.document
         fmt = next(f for f in imageio.export_formats() if f.name == options.format)
         stem = os.path.splitext(os.path.basename(doc.path))[0]
