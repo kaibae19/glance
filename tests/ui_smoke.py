@@ -1,6 +1,7 @@
 """Drive the installed app: v0.3 acceptance (open a 1024² icon, Adjust Size to 400 by typing, Enter, Save,
 Replace) and v0.4 crop (drag, crop, undo, 1:1 ratio, click to clear, select all) and v0.5 export (sheet rows per
-format, JPEG flattened onto white with EXIF stripped, document untouched). Not collected by pytest; run with scripts/ui-smoke (needs a display).
+format, JPEG flattened onto white with EXIF stripped, document untouched) and v0.6 markup (draw, move, recolour, delete,
+undo, save flattened). Not collected by pytest; run with scripts/ui-smoke (needs a display).
 
 Usage: ui_smoke.py PKGDATADIR WORKDIR
 """
@@ -29,6 +30,8 @@ _img = Image.new("RGB", (1600, 1000), (60, 110, 170))
 for _x in range(0, 1600, 100):
     _img.paste((230, 190, 60), (_x, 0, _x + 50, 1000))
 _img.save(photo)
+shot = os.path.join(workdir, "shot.png")
+Image.new("RGB", (800, 500), "white").save(shot)
 logo = os.path.join(workdir, "logo.png")
 _img = Image.new("RGBA", (300, 200), (0, 0, 0, 0))
 _img.paste((40, 90, 200, 255), (50, 50, 250, 150))
@@ -234,6 +237,79 @@ def exported(win, target, options):
     step(f"document still {os.path.basename(doc.path)}, format {doc.info.format}, dirty {doc.dirty}")
     ok = ok and doc.path == logo and doc.info.format == "PNG" and result.pop("export_ok")
     result["ok"] = result["ok"] and ok
+    win.open_file(Gio.File.new_for_path(shot))
+    wait(lambda: win.document and win.document.path == shot, lambda: markup_start(win))
+
+
+# --- v0.6 markup -------------------------------------------------------------------------------
+
+def drag(canvas, a, b, shift=False):
+    canvas.begin_drag(*canvas.to_widget(*a))
+    mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+    canvas.update_drag(*canvas.to_widget(*mid), shift)
+    canvas.update_drag(*canvas.to_widget(*b), shift)
+    canvas.end_drag()
+
+
+def kinds(doc):
+    return [sh.kind for sh in doc.open_markup.shapes] if doc.open_markup else []
+
+
+def markup_start(win):
+    canvas, doc = win.canvas, win.document
+    win.activate_action("win.markup", None)
+    step(f"markup bar visible {win.markup_bar.get_visible()}, swatches {len(list(_children(win.swatches)))}")
+    win.activate_action("win.markup-tool", GLib.Variant("s", "rect"))
+    drag(canvas, (100, 100), (300, 250))
+    win.activate_action("win.markup-tool", GLib.Variant("s", "arrow"))
+    drag(canvas, (500, 400), (350, 260))
+    win.activate_action("win.markup-tool", GLib.Variant("s", "text"))
+    canvas.commit_text(-1, (420, 80), "Look here")  # what the popover's Enter does
+    step(f"shapes {kinds(doc)}; ops {len(doc.ops)}; undo steps {doc._index}; selected {canvas.selected_shape}")
+    ok = kinds(doc) == ["rect", "arrow", "text"] and len(doc.ops) == 1 and doc._index == 3
+    win.activate_action("win.markup-tool", GLib.Variant("s", "select"))
+    drag(canvas, (100, 175), (140, 195))  # grab the rect's left edge, move it 40, 20
+    rect = doc.open_markup.shapes[0]
+    step(f"moved rect -> p0 {tuple(round(v) for v in rect.p0)}")
+    ok = ok and tuple(round(v) for v in rect.p0) == (140, 120)
+    win.activate_action("win.markup-color", GLib.Variant("s", "#3584e4"))
+    step(f"recoloured rect -> {tuple(round(c, 2) for c in doc.open_markup.shapes[0].color)}")
+    ok = ok and doc.open_markup.shapes[0].color[2] > 0.8
+    canvas.select_shape(1)
+    win.activate_action("win.markup-delete", None)
+    step(f"deleted arrow -> {kinds(doc)}")
+    ok = ok and kinds(doc) == ["rect", "text"]
+    win.activate_action("win.undo", None)
+    step(f"undo -> {kinds(doc)}; canvas shapes {len(canvas.shapes)}")
+    ok = ok and kinds(doc) == ["rect", "arrow", "text"] and len(canvas.shapes) == 3
+    canvas.select_shape(0)
+    result["markup_ok"] = ok
+    GLib.timeout_add(200, lambda: markup_save(win))
+
+
+def _children(box):
+    child = box.get_first_child()
+    while child:
+        yield child
+        child = child.get_next_sibling()
+
+
+def markup_save(win):
+    shoot(win, "markup.png")
+    doc = win.document
+    win._overwrite_ok = True
+    win.on_save()
+    with Image.open(shot) as img:
+        img = img.convert("RGB")
+        edge = img.getpixel((140, 200))  # moved rect's left edge, now blue
+        inside = img.getpixel((220, 180))
+        shaft = img.getpixel((425, 330))  # middle of the arrow
+        text_px = Image.open(shot).convert("L").crop((420, 80, 560, 120)).getextrema()
+    step(f"saved: rect edge {edge}, inside {inside}, arrow {shaft}, text luminance range {text_px}")
+    ok = (edge[2] > 180 and edge[0] < 120 and inside == (255, 255, 255) and shaft[0] > 180 and shaft[1] < 80
+          and text_px[0] < 100 and not doc.dirty and doc.open_markup is not None)
+    step(f"after save: still editable {doc.open_markup is not None}, dirty {doc.dirty}")
+    result["ok"] = result["ok"] and ok and result.pop("markup_ok")
     win.close()
     app.quit()
 
