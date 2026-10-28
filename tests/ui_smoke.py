@@ -71,14 +71,21 @@ def opened(win):
 
 def dialog_up(win):
     dialog = win.get_visible_dialog()
-    step(f"dialog {type(dialog).__name__}, focus on width: {dialog.width_row.has_focus() or dialog.width_row.is_focus()}")
+    step(f"dialog {type(dialog).__name__}")
     dialog.width_row.set_text("400")  # what typing does: the editable's text changes
     step(f"typed 400 -> model {dialog.model.size()}, height row {dialog.height_row.get_text()}")
     wait(lambda: "about" in (dialog.result_row.get_subtitle() or ""), lambda: estimated(win, dialog))
 
 
+def focused_in(widget, root):
+    focus = root.get_focus()
+    while focus and focus is not widget:
+        focus = focus.get_parent()
+    return focus is widget
+
+
 def estimated(win, dialog):
-    step(f"result: {dialog.result_row.get_subtitle()}")
+    step(f"result: {dialog.result_row.get_subtitle()}; focus in width: {focused_in(dialog.width_row, win)}")
     shoot(win, "adjust-size.png")
     dialog.on_apply()  # what Enter does
     wait(lambda: win.document.size == (400, 400), lambda: resized(win))
