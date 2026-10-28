@@ -28,6 +28,7 @@ class GlanceWindow(Adw.ApplicationWindow):
     __gtype_name__ = "GlanceWindow"
 
     toast_overlay = Gtk.Template.Child()
+    header_bar = Gtk.Template.Child()
     window_title = Gtk.Template.Child()
     stack = Gtk.Template.Child()
     canvas = Gtk.Template.Child()
@@ -47,6 +48,7 @@ class GlanceWindow(Adw.ApplicationWindow):
         self._siblings = []
         self._load_seq = 0
         self._fit_on_load = False
+        self._present_pending = False
         self._overwrite_ok = False  # the user confirmed saving over this document's original
         self._closing = False
         self._add_actions()
@@ -326,12 +328,24 @@ class GlanceWindow(Adw.ApplicationWindow):
             self.open_file(files[0])
         return True
 
-    def open_file(self, gfile):
+    def open_file(self, gfile, present=False):
+        """present: show the window once the image has loaded (already sized to it), not before."""
         path = gfile.get_path()
         if path is None:
             self.toast("Glance can only open local files")
+            if present:
+                self.present()
             return
+        if present:
+            self._present_pending = True
+            GLib.timeout_add(1000, self._present_now)  # don't wait forever on a slow decode
         self._confirm_discard(lambda: self._load(path, fit_window=True))
+
+    def _present_now(self):
+        if self._present_pending:
+            self._present_pending = False
+            self.present()
+        return False
 
     def _load(self, path, fit_window=False):
         """Open path in the background. fit_window: size the window to the image (a new open, not Left/Right)."""
@@ -353,6 +367,7 @@ class GlanceWindow(Adw.ApplicationWindow):
             return False  # a newer load superseded this one
         if error:
             self.toast(f"Couldn't open {os.path.basename(path)}: {error}")
+            self._present_now()
             return False
         self.document = doc
         self._overwrite_ok = False
@@ -368,17 +383,14 @@ class GlanceWindow(Adw.ApplicationWindow):
         self._update_state()
         if self._fit_on_load:
             self._fit_window_to(doc.size)
+        self._present_now()
         return False
 
     def _fit_window_to(self, size):
         """Resize the window so the image shows at 100%, or as large as fits on the monitor."""
         if self.is_maximized() or self.is_fullscreen():
             return
-        if not self.get_mapped():
-            handler = []
-            handler.append(self.connect("map", lambda *_: (self.disconnect(handler[0]), self._fit_window_to(size))))
-            return
-        display, surface = self.get_display(), self.get_surface()
+        display, surface = self.get_display(), self.get_surface() if self.get_mapped() else None
         monitor = display.get_monitor_at_surface(surface) if surface else None
         if monitor is None and display.get_monitors().get_n_items():
             monitor = display.get_monitors().get_item(0)
@@ -386,15 +398,22 @@ class GlanceWindow(Adw.ApplicationWindow):
             return
         area = monitor.get_geometry()  # logical px; GTK has no work area on Wayland
         scale = surface.get_scale() if surface else monitor.get_scale()
-        # Everything around the image: header bar, markup bar (when shown), borders.
-        chrome_w = max(0, self.get_width() - self.stack.get_width())
-        chrome_h = max(0, self.get_height() - self.stack.get_height())
+        chrome_w, chrome_h = self._chrome()
         room_w = area.width * FIT_SCREEN_W - chrome_w
         room_h = area.height * FIT_SCREEN_H - chrome_h
         iw, ih = size[0] / scale, size[1] / scale  # 100% = one image px per device px, as in the canvas
         k = min(1.0, room_w / iw, room_h / ih)
         self.set_default_size(max(FIT_MIN_W, round(iw * k + chrome_w)), max(FIT_MIN_H, round(ih * k + chrome_h)))
         self.canvas.zoom_fit()
+
+    def _chrome(self):
+        """(w, h) around the image: header bar, markup bar when shown. Measured before the window is shown."""
+        if self.get_mapped():
+            return max(0, self.get_width() - self.stack.get_width()), max(0, self.get_height() - self.stack.get_height())
+        h = self.header_bar.measure(Gtk.Orientation.VERTICAL, -1)[1]
+        if self.markup_bar.get_visible():
+            h += self.markup_bar.measure(Gtk.Orientation.VERTICAL, -1)[1] + self.markup_bar.get_margin_bottom()
+        return 0, h
 
     def _sibling_index(self):
         if not self.document or self.document.path not in self._siblings:

@@ -37,8 +37,7 @@ class GlanceApplication(Adw.Application):
         # One window per file, as Preview does when files are opened separately.
         for gfile in files:
             window = GlanceWindow(application=self)
-            window.open_file(gfile)
-            window.present()
+            window.open_file(gfile, present=True)  # appears once loaded, already at the image's size
             self._dev_screenshot(window)
 
     def _quit(self):
