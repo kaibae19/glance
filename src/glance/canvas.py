@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """The image view: fit or zoom, pan, a checkerboard behind transparency, and the crop selection.
 
 Mouse, as in Preview: drag on the image to select (Shift = square), drag inside the selection to move it,

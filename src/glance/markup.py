@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Markup shapes and their drawing, shared by the canvas (live, as vectors) and Save/Export (as pixels).
 
 Pure Cairo + Pango, no GTK widgets, so it tests headless. Coordinates are image pixels.

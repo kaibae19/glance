@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Edit operations. Each op is an immutable value whose apply() maps a PIL image to a new one."""
 
 from dataclasses import dataclass

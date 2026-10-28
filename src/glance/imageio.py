@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Load, describe and save images with Pillow. No GTK here, so it runs headless under pytest."""
 
 import io

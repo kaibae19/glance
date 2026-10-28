@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Drive the installed app: v0.3 acceptance (open a 1024² icon, Adjust Size to 400 by typing, Enter, Save,
 Replace) and v0.4 crop (drag, crop, undo, 1:1 ratio, click to clear, select all) and v0.5 export (sheet rows per
 format, JPEG flattened onto white with EXIF stripped, document untouched) and v0.6 markup (draw, move, recolour, delete,

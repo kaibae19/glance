@@ -2,7 +2,7 @@
 Name=Glance
 Comment=View and quickly edit images
 Exec=glance %U
-Icon=image-x-generic
+Icon=io.github.kaibae19.Glance
 Terminal=false
 Type=Application
 Categories=Graphics;Viewer;GTK;GNOME;

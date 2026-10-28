@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Run a command against a throwaway headless GNOME Shell (no login needed). A temporary HOME keeps the
 # user's extensions, indexer and accounts out of it. Usage: scripts/headless-run CMD [ARG…]
 set -e

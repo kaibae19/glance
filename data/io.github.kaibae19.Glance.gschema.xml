@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<schemalist gettext-domain="glance">
+  <schema id="io.github.kaibae19.Glance" path="/io/github/kaibae19/Glance/">
+    <key name="window-width" type="i">
+      <default>960</default>
+    </key>
+    <key name="window-height" type="i">
+      <default>680</default>
+    </key>
+    <key name="window-maximized" type="b">
+      <default>false</default>
+    </key>
+    <key name="export-format" type="s">
+      <default>''</default>
+      <summary>Last export format (Pillow name); empty = the image's own</summary>
+    </key>
+    <key name="export-quality" type="i">
+      <range min="1" max="100"/>
+      <default>90</default>
+    </key>
+    <key name="export-lossless" type="b">
+      <default>false</default>
+    </key>
+    <key name="export-keep-alpha" type="b">
+      <default>true</default>
+    </key>
+    <key name="export-background" type="s">
+      <default>'#ffffff'</default>
+    </key>
+    <key name="export-strip-metadata" type="b">
+      <default>false</default>
+    </key>
+  </schema>
+</schemalist>

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Crop selection geometry, in image pixel coordinates. No GTK here, so it tests headless.
 
 Ratios are width / height. Callers orient a ratio (landscape or portrait) before passing it in.

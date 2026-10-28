@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Keyboard shortcuts: macOS Preview's, with ⌘ read as Ctrl (Kailey, 2026-10-28).
 
 GTK runs application accelerators in the capture phase, before the focused widget, so a text field would
@@ -5,7 +6,7 @@ never see them. Keys that text fields use (arrows, Ctrl+A, Ctrl+Z) are therefore
 bubble phase instead: they fire only when the focused widget doesn't take the key.
 """
 
-from gi.repository import Gtk
+from gi.repository import Adw, Gtk
 
 # action → accelerators. Comments give Preview's key where it differs or isn't obvious.
 APP = {
@@ -25,6 +26,7 @@ APP = {
     "win.rotate-right": ["<Control>r"],
     "win.info": ["<Control>i"],  # Preview: Show Inspector
     "win.fullscreen": ["<Control><Super>f", "F11"],  # Preview ⌃⌘F
+    "win.shortcuts": ["<Control>question"],
 }
 
 # Yield to text fields (see above). Menus show these through the items' accel attribute.
@@ -35,6 +37,40 @@ WINDOW = {
     "win.previous": ["Left"],
     "win.next": ["Right"],
 }
+
+
+# The Keyboard Shortcuts dialog, built from the tables above so it can't drift from the real bindings.
+SECTIONS = [
+    ("File", [("win.open", "Open"), ("win.save", "Save"), ("win.save-as", "Save As"),
+              ("win.close", "Close Window"), ("app.quit", "Quit")]),
+    ("Edit", [("win.undo", "Undo"), ("win.redo", "Redo"), ("win.select-all", "Select All"),
+              ("win.crop", "Crop to Selection"), ("win.adjust-size", "Adjust Size"),
+              ("win.rotate-left", "Rotate Left"), ("win.rotate-right", "Rotate Right")]),
+    ("View", [("win.zoom-in", "Zoom In"), ("win.zoom-out", "Zoom Out"), ("win.zoom-actual", "Actual Size"),
+              ("win.zoom-fit", "Zoom to Fit"), ("win.fullscreen", "Full Screen"), ("win.info", "Info"),
+              ("win.previous", "Previous Image in Folder"), ("win.next", "Next Image in Folder")]),
+    ("Markup", [("win.markup", "Show Markup Toolbar"), ("Delete", "Delete Selected Shape"),
+                ("Escape", "Deselect"), ("Return", "Crop to Selection (image focused)")]),
+    ("General", [("win.shortcuts", "Keyboard Shortcuts")]),
+]
+
+
+def accelerator(key):
+    """An action's first accelerator, or key itself when it is a plain key name."""
+    accels = APP.get(key) or WINDOW.get(key)
+    return accels[0] if accels else key
+
+
+def show_dialog(window):
+    if not hasattr(Adw, "ShortcutsDialog"):  # libadwaita < 1.8
+        return
+    dialog = Adw.ShortcutsDialog()
+    for title, items in SECTIONS:
+        section = Adw.ShortcutsSection.new(title)
+        for key, label in items:
+            section.add(Adw.ShortcutsItem.new(label, accelerator(key)))
+        dialog.add(section)
+    dialog.present(window)
 
 
 def install(app):

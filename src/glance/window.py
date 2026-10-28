@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 import os
 import threading
 
@@ -5,7 +6,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango
 
 from . import markup
 
-from . import imageio, shortcuts
+from . import imageio, settings, shortcuts
 from .adjust_size import AdjustSizeDialog
 from .export import ExportDialog
 from .canvas import Canvas  # noqa: F401  registers GlanceCanvas for the template
@@ -44,6 +45,7 @@ class GlanceWindow(Adw.ApplicationWindow):
         self._closing = False
         self._add_actions()
         shortcuts.install_window(self)
+        self._restore_window_state()
 
         drop = Gtk.DropTarget.new(Gdk.FileList, Gdk.DragAction.COPY)
         drop.connect("drop", self._on_drop)
@@ -87,6 +89,7 @@ class GlanceWindow(Adw.ApplicationWindow):
             "next": lambda: self._step(1),
             "fullscreen": lambda: self.unfullscreen() if self.is_fullscreen() else self.fullscreen(),
             "info": self.info_button.popup,
+            "shortcuts": lambda: shortcuts.show_dialog(self),
         }
         for name, handler in handlers.items():
             action = Gio.SimpleAction.new(name, None)
@@ -481,10 +484,12 @@ class GlanceWindow(Adw.ApplicationWindow):
     def on_export(self):
         if self.document:
             app = self.get_application()
-            ExportDialog(self.document, getattr(app, "export_defaults", None), self._choose_export_path).present(self)
+            defaults = getattr(app, "export_defaults", None) or settings.load_export(self._settings)
+            ExportDialog(self.document, defaults, self._choose_export_path).present(self)
 
     def _choose_export_path(self, options):
-        self.get_application().export_defaults = options  # remembered for this run (GSettings later)
+        self.get_application().export_defaults = options
+        settings.save_export(self._settings, options)
         doc = self.document
         fmt = next(f for f in imageio.export_formats() if f.name == options.format)
         stem = os.path.splitext(os.path.basename(doc.path))[0]
@@ -564,8 +569,30 @@ class GlanceWindow(Adw.ApplicationWindow):
         dialog.connect("response", on_response)
         dialog.present(self)
 
+    @property
+    def _settings(self):
+        app = self.get_application()
+        return getattr(app, "settings", None) if app else None
+
+    def _restore_window_state(self):
+        s = self._settings
+        if s:
+            self.set_default_size(s.get_int("window-width"), s.get_int("window-height"))
+            if s.get_boolean("window-maximized"):
+                self.maximize()
+
+    def _save_window_state(self):
+        s = self._settings
+        if s:
+            s.set_boolean("window-maximized", self.is_maximized())
+            if not self.is_maximized() and not self.is_fullscreen():
+                w, h = self.get_default_size()
+                s.set_int("window-width", w)
+                s.set_int("window-height", h)
+
     def _on_close_request(self, _window):
         if self._closing or not (self.document and self.document.dirty):
+            self._save_window_state()
             return False
 
         def close():

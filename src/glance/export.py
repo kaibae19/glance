@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """File → Export, after Preview: pick format and options here, then the file name in the file chooser.
 
 Export writes a copy; the document keeps its own file and its unsaved state.

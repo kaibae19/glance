@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Build into ./_build, install into ./_install, run. Usage: scripts/dev [image…]
 set -e
 cd "$(dirname "$0")/.."

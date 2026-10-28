@@ -1,10 +1,14 @@
 #!@PYTHON@
+# SPDX-License-Identifier: GPL-3.0-or-later
 import os
 import signal
 import sys
 
 pkgdatadir = '@pkgdatadir@'
 sys.path.insert(1, pkgdatadir)
+# Find our GSettings schema when installed to a private prefix (scripts/dev); harmless under /usr or /app.
+os.environ['GSETTINGS_SCHEMA_DIR'] = os.pathsep.join(
+    p for p in ('@schemadir@', os.environ.get('GSETTINGS_SCHEMA_DIR')) if p)
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 if __name__ == '__main__':

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3584e4"/>
+      <stop offset="1" stop-color="#99c1f1"/>
+    </linearGradient>
+    <clipPath id="photo">
+      <rect x="22" y="24" width="84" height="64" rx="4"/>
+    </clipPath>
+  </defs>
+  <!-- card -->
+  <rect x="12" y="18" width="104" height="90" rx="10" fill="#9a9996"/>
+  <rect x="12" y="14" width="104" height="90" rx="10" fill="#f6f5f4"/>
+  <!-- photo -->
+  <g clip-path="url(#photo)">
+    <rect x="22" y="24" width="84" height="64" fill="url(#sky)"/>
+    <circle cx="86" cy="42" r="8" fill="#f8e45c"/>
+    <path d="M22 88 L50 54 L66 72 L78 60 L106 88 Z" fill="#26a269"/>
+    <path d="M22 88 L50 54 L59 65 L42 88 Z" fill="#33d17a"/>
+  </g>
+  <!-- crop corners -->
+  <path d="M17 34 V19 H32" fill="none" stroke="#e01b24" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M111 78 V93 H96" fill="none" stroke="#e01b24" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- pencil -->
+  <g transform="rotate(-45 90 100)">
+    <rect x="64" y="93" width="44" height="14" rx="2" fill="#f5c211"/>
+    <rect x="64" y="100" width="44" height="7" fill="#e5a50a"/>
+    <rect x="102" y="93" width="10" height="14" rx="3" fill="#c01c28"/>
+    <rect x="99" y="93" width="4" height="14" fill="#c0bfbc"/>
+    <path d="M64 93 L52 100 L64 107 Z" fill="#f9d6a5"/>
+    <path d="M56 97.7 L52 100 L56 102.3 Z" fill="#3d3846"/>
+  </g>
+</svg>

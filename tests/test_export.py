@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 from PIL import Image, ImageCms
 
 from glance import imageio

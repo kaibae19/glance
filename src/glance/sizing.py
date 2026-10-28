@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Adjust Size arithmetic, after Preview's sheet. No GTK here, so it tests headless.
 
 Pixels are the truth; every other unit is derived from pixels and the resolution (pixels per inch).

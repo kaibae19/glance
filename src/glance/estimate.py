@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Background estimates (resulting file size) for the Adjust Size and Export sheets."""
 
 import threading

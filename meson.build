@@ -1,4 +1,4 @@
-project('glance', version: '0.1.0', meson_version: '>= 1.0.0')
+project('glance', version: '1.0.0', meson_version: '>= 1.0.0', license: 'GPL-3.0-or-later')
 
 gnome = import('gnome')
 py = import('python').find_installation('python3')
@@ -12,4 +12,8 @@ subdir('bin')
 test('unit', py, args: ['-m', 'pytest', '-q', meson.project_source_root() / 'tests'],
      workdir: meson.project_source_root())
 
-gnome.post_install(update_desktop_database: true)
+gnome.post_install(
+  glib_compile_schemas: true,
+  gtk_update_icon_cache: true,
+  update_desktop_database: true,
+)

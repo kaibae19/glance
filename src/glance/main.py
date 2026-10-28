@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 import os
 import sys
 
@@ -7,7 +8,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, GLib, Gtk
 
-from . import shortcuts
+from . import settings, shortcuts
 from .window import GlanceWindow
 
 APP_ID = "io.github.kaibae19.Glance"
@@ -24,6 +25,7 @@ class GlanceApplication(Adw.Application):
 
     def do_startup(self):
         Adw.Application.do_startup(self)
+        self.settings = settings.get()  # None when running uninstalled
         shortcuts.install(self)
 
     def do_activate(self):
@@ -44,9 +46,11 @@ class GlanceApplication(Adw.Application):
             window.close()  # each window asks about its own unsaved edits
 
     def _about(self):
-        Adw.AboutDialog(application_name="Glance", application_icon="image-x-generic",
-                        version=self.version, developer_name="Kailey",
-                        comments="Quick image viewing and editing, the macOS Preview way").present(self.props.active_window)
+        Adw.AboutDialog(application_name="Glance", application_icon=APP_ID, version=self.version,
+                        developer_name="Kailey", copyright="© 2026 Kailey",
+                        comments="Quick image viewing and editing, the macOS Preview way",
+                        website="https://github.com/kaibae19/glance",
+                        license_type=Gtk.License.GPL_3_0).present(self.props.active_window)
 
     def _dev_screenshot(self, window):
         """GLANCE_SCREENSHOT=out.png: save a picture of the window after ~1.5 s, then quit (headless checks)."""

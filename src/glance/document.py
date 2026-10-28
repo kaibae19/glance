@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """An open image: the untouched original plus a list of ops, with undo/redo and a dirty flag.
 
 History is a list of op tuples. apply() adds an op; amend() replaces the last one (how the markup layer is

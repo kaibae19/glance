@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+<component type="desktop-application">
+  <id>io.github.kaibae19.Glance</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Glance</name>
+  <summary>View and quickly edit images</summary>
+  <description>
+    <p>
+      Glance opens an image, lets you make the everyday changes, and saves it, the way Preview does on a Mac.
+      It is for quick jobs, not for painting or retouching.
+    </p>
+    <ul>
+      <li>Adjust Size with pixels, percent or print units, resolution and a choice of resampling</li>
+      <li>Crop to a selection, freely or at a fixed ratio</li>
+      <li>Rotate and flip without losing quality until you save</li>
+      <li>Export to PNG, JPEG, WebP, TIFF, GIF or BMP, with quality and transparency options, and strip metadata</li>
+      <li>Mark up screenshots with rectangles, ovals, lines, arrows, highlights and text, editable until you move on</li>
+    </ul>
+  </description>
+  <developer id="io.github.kaibae19">
+    <name>Kailey</name>
+  </developer>
+  <launchable type="desktop-id">io.github.kaibae19.Glance.desktop</launchable>
+  <provides>
+    <binary>glance</binary>
+  </provides>
+  <url type="homepage">https://github.com/kaibae19/glance</url>
+  <url type="vcs-browser">https://github.com/kaibae19/glance</url>
+  <content_rating type="oars-1.1"/>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <branding>
+    <color type="primary" scheme_preference="light">#99c1f1</color>
+    <color type="primary" scheme_preference="dark">#1a5fb4</color>
+  </branding>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/kaibae19/glance/main/docs/screenshots/markup.png</image>
+      <caption>Marking up a screenshot</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/kaibae19/glance/main/docs/screenshots/adjust-size.png</image>
+      <caption>Adjust Size</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/kaibae19/glance/main/docs/screenshots/crop.png</image>
+      <caption>Cropping to a selection</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/kaibae19/glance/main/docs/screenshots/export.png</image>
+      <caption>Export options</caption>
+    </screenshot>
+  </screenshots>
+  <releases>
+    <release version="1.0.0" date="2026-10-28">
+      <description>
+        <p>First release: viewing, Adjust Size, crop, rotate and flip, export, and markup.</p>
+      </description>
+    </release>
+  </releases>
+</component>

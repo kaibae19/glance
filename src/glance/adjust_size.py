@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tools → Adjust Size, after Preview's sheet. The arithmetic lives in sizing.py."""
 
 from gi.repository import Adw, Gdk, GLib, Gtk

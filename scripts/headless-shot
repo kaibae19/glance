@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Screenshot Glance in a throwaway headless GNOME Shell.
 # Usage: scripts/headless-shot out.png [image…]    (run scripts/dev or meson install first)
 set -e

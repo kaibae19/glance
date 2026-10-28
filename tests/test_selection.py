@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 import pytest
 
 from glance.selection import (Rect, conform, from_drag, full, move, orient, ratio_value, resize)
