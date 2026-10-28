@@ -212,12 +212,17 @@ class PdfView(Gtk.Box):
         self._store.remove_all()
         for i in range(n):
             self._store.append(PageItem(i))
-        if select:
-            for i in select:
-                if 0 <= i < n:
-                    self.selection.select_item(i, False)
         self.current_page = min(self.current_page, max(0, n - 1))
+        select = [i for i in (select or ()) if 0 <= i < n] or ([self.current_page] if n else [])
+        for i in select:
+            self.selection.select_item(i, False)
         self.emit("page-changed")
+
+    def _follow(self, position):
+        """As in Preview, a single selection follows the current page, so what Delete or Rotate will act on is
+        always highlighted; a multiple selection stays put."""
+        if len(self.selected_positions()) <= 1:
+            self.selection.select_item(position, True)
 
     def selected_positions(self):
         bits = self.selection.get_selection()
@@ -275,6 +280,7 @@ class PdfView(Gtk.Box):
         self.current_page = position
         if select:
             self.sidebar.scroll_to(position, Gtk.ListScrollFlags.NONE, None)
+            self._follow(position)
         self.emit("page-changed")
 
     def step(self, delta):
@@ -294,6 +300,7 @@ class PdfView(Gtk.Box):
                 best, best_y = widget.position, y
         if best is not None and best != self.current_page:
             self.current_page = best
+            self._follow(best)
             self.emit("page-changed")
 
     def _on_scroll(self, controller, _dx, dy):

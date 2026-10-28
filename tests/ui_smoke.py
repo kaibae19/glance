@@ -449,6 +449,8 @@ def pdf_view(win):
     view.go_to(2)
     step(f"go to page 3 -> current {view.current_page + 1}, subtitle {win.window_title.get_subtitle()!r}")
     ok = ok and view.current_page == 2
+    step(f"selected follows the current page: {view.selected_positions()}")
+    ok = ok and view.selected_positions() == [2]
     view.selection.select_item(0, True)
     win.activate_action("win.rotate-right", None)
     step(f"rotate page 1 -> turns {[p.turns for p in pdf.pages]}, still selected {view.selected_positions()}")
@@ -465,8 +467,9 @@ def pdf_view(win):
     step(f"delete pages 5–6 -> {len(pdf)} pages; can undo {pdf.can_undo}")
     ok = ok and len(pdf) == 4
     win.activate_action("win.undo", None)
-    step(f"undo -> {len(pdf)} pages; title {win.get_title()!r}")
-    ok = ok and len(pdf) == 6 and win.get_title().endswith("Edited")
+    step(f"undo -> {len(pdf)} pages; title {win.get_title()!r}; selected {view.selected_positions()}")
+    ok = ok and len(pdf) == 6 and win.get_title().endswith("Edited") and len(view.selected_positions()) == 1
+    view.selection.select_range(4, 2, True)
     win.activate_action("win.delete-pages", None)
     target = os.path.join(workdir, "report-edited.pdf")
     win._save_to(target, None)  # what Save As leads to
