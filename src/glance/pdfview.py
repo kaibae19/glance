@@ -238,8 +238,10 @@ class PdfView(Gtk.Box):
         if self.fit_width and self.document and len(self.document):
             width = self.pages_scroll.get_width() - 2 * PAGE_GAP - 16
             if width > 0:
-                widest = max(self.document.page_size(i)[0] for i in range(min(len(self.document), 50)))
-                self._set_zoom(width / widest, keep_fit=True)
+                # The most common page width, so one landscape page among portrait ones doesn't shrink them all
+                # (it scrolls sideways instead).
+                widths = sorted(self.document.page_size(i)[0] for i in range(min(len(self.document), 50)))
+                self._set_zoom(width / widths[len(widths) // 2], keep_fit=True)
         return False
 
     def _set_zoom(self, zoom, keep_fit=False):

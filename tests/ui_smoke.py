@@ -443,7 +443,8 @@ def pdf_view(win):
     step(f"PDF open: page {win.stack.get_visible_child_name()}, {len(pdf)} pages, window {win.get_width()}×{win.get_height()}, "
          f"zoom {view.zoom:.2f}, subtitle {win.window_title.get_subtitle()!r}; "
          f"markup enabled {win.lookup_action('markup').get_enabled()}, crop {win.lookup_action('crop').get_enabled()}")
-    ok = (win.stack.get_visible_child_name() == "pdf" and len(pdf) == 4 and view.zoom > 0.5
+    # 466 px page area − margins over the A4 width (595 pt): ≈ 0.70, not the landscape page's 0.50.
+    ok = (win.stack.get_visible_child_name() == "pdf" and len(pdf) == 4 and 0.65 < view.zoom < 0.75
           and not win.lookup_action("markup").get_enabled())
     shoot(win, "pdf.png")
     view.go_to(2)
