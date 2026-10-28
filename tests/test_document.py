@@ -101,7 +101,7 @@ def test_icc_profile_kept(tmp_path):
 
 def test_animated_refused(tmp_path):
     path = tmp_path / "anim.gif"
-    frames = [Image.new("P", (2, 2), i) for i in range(2)]
+    frames = [Image.new("RGB", (2, 2), c) for c in ("red", "blue")]
     frames[0].save(path, save_all=True, append_images=frames[1:])
     doc = Document.open(str(path))
     assert doc.info.animated
