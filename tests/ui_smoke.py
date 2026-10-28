@@ -21,6 +21,7 @@ from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
 from PIL import Image  # noqa: E402
 
 Gio.Resource.load(os.path.join(pkgdatadir, "glance.gresource"))._register()
+from glance import markup as glance_markup  # noqa: E402
 from glance.main import GlanceApplication  # noqa: E402
 
 icon = os.path.join(workdir, "icon.png")
@@ -282,9 +283,49 @@ def markup_start(win):
     win.activate_action("win.undo", None)
     step(f"undo -> {kinds(doc)}; canvas shapes {len(canvas.shapes)}")
     ok = ok and kinds(doc) == ["rect", "arrow", "text"] and len(canvas.shapes) == 3
-    canvas.select_shape(0)
     result["markup_ok"] = ok
+    text_format(win)
+
+
+def text_format(win):
+    from gi.repository import Pango
+    canvas, doc = win.canvas, win.document
+    canvas.select_shape(2)
+    shown = win.text_controls.get_visible()
+    step(f"text selected: text controls {shown}, weight menu {win.weight_button.get_visible()}, "
+         f"font {win.font_button.get_font_desc().to_string()!r}, size {win.size_spin.get_value()}")
+    ok = shown and not win.weight_button.get_visible()
+    win.font_button.set_font_desc(Pango.FontDescription.from_string("Monospace Bold"))
+    win.size_spin.set_value(40)
+    win.activate_action("win.markup-color", GLib.Variant("s", "#000000"))
+    t = doc.open_markup.shapes[2]
+    step(f"restyled text -> font {t.font!r}, size {t.size}, colour {markup_hex(t.color)}")
+    ok = ok and t.font == "Monospace Bold" and t.size == 40 and markup_hex(t.color) == "#000000"
+    canvas.select_shape(0)
+    state = win.lookup_action("markup-color").get_state().get_string()
+    step(f"rect selected: text controls {win.text_controls.get_visible()}, colour state {state}")
+    ok = ok and not win.text_controls.get_visible() and state == "#3584e4"
+    canvas.select_shape(2)
+    r = glance_markup.bbox(doc.open_markup.shapes[2])
+    canvas.begin_drag(*canvas.to_widget(r.right, r.bottom))
+    canvas.update_drag(*canvas.to_widget(r.right + 20, r.bottom + 10))
+    canvas.update_drag(*canvas.to_widget(r.right + r.w * 0.25, r.bottom + r.h * 0.25))
+    canvas.end_drag()
+    t = doc.open_markup.shapes[2]
+    step(f"corner drag -> text size {t.size:.1f}, p0 {tuple(round(v) for v in t.p0)}")
+    ok = ok and 48 <= t.size <= 52 and tuple(round(v) for v in t.p0) == (420, 80)
+    canvas.preview_text(2, t.p0, "Look here!")
+    live = canvas._live[2].text if canvas._live else None
+    canvas.commit_text(2, t.p0, "Look here!")
+    step(f"live preview text {live!r}; committed {doc.open_markup.shapes[2].text!r}")
+    ok = ok and live == "Look here!" and doc.open_markup.shapes[2].text == "Look here!"
+    result["markup_ok"] = result["markup_ok"] and ok
+    canvas.select_shape(2)
     GLib.timeout_add(200, lambda: markup_save(win))
+
+
+def markup_hex(rgba):
+    return glance_markup.rgba_to_hex(rgba)
 
 
 def _children(box):
