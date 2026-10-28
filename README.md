@@ -18,6 +18,12 @@ Mouse, as in Preview: drag to select, Ctrl+K crops; scroll or middle-drag pans; 
 
     flatpak-builder --user --install --force-clean flatpak-build io.github.kaibae19.Glance.json
 
+With Flathub's Builder app (no system packages needed):
+
+    flatpak run --user org.flatpak.Builder --user --disable-rofiles-fuse --force-clean \
+        --repo=flatpak-repo flatpak-build io.github.kaibae19.Glance.json
+    flatpak update --user io.github.kaibae19.Glance      # installed from the local remote "glance-local"
+
 Builds the checkout you are in (GNOME 51 runtime; Pillow 12.1.1 wheels, which include AVIF).
 `--filesystem=host` is there for Preview-style folder stepping (Left/Right) and saving next to the original;
 the file chooser alone would only grant the one file.
