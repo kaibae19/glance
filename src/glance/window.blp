@@ -32,6 +32,14 @@ template $GlanceWindow: Adw.ApplicationWindow {
         }
 
         [end]
+        ToggleButton {
+          focus-on-click: false;
+          icon-name: "glance-markup-symbolic";
+          tooltip-text: _("Markup");
+          action-name: "win.markup";
+        }
+
+        [end]
         Button {
           focus-on-click: false;
           icon-name: "object-rotate-left-symbolic";
@@ -81,6 +89,108 @@ template $GlanceWindow: Adw.ApplicationWindow {
         }
       }
 
+      [top]
+      Box markup_bar {
+        visible: false;
+        spacing: 12;
+        margin-start: 6;
+        margin-end: 6;
+        margin-bottom: 6;
+        halign: center;
+
+        Box {
+          styles [
+            "linked",
+          ]
+
+          ToggleButton {
+            focus-on-click: false;
+            icon-name: "glance-tool-select-symbolic";
+            tooltip-text: _("Select");
+            action-name: "win.markup-tool";
+            action-target: "'select'";
+          }
+
+          ToggleButton {
+            focus-on-click: false;
+            icon-name: "glance-tool-rect-symbolic";
+            tooltip-text: _("Rectangle");
+            action-name: "win.markup-tool";
+            action-target: "'rect'";
+          }
+
+          ToggleButton {
+            focus-on-click: false;
+            icon-name: "glance-tool-ellipse-symbolic";
+            tooltip-text: _("Oval");
+            action-name: "win.markup-tool";
+            action-target: "'ellipse'";
+          }
+
+          ToggleButton {
+            focus-on-click: false;
+            icon-name: "glance-tool-line-symbolic";
+            tooltip-text: _("Line");
+            action-name: "win.markup-tool";
+            action-target: "'line'";
+          }
+
+          ToggleButton {
+            focus-on-click: false;
+            icon-name: "glance-tool-arrow-symbolic";
+            tooltip-text: _("Arrow");
+            action-name: "win.markup-tool";
+            action-target: "'arrow'";
+          }
+
+          ToggleButton {
+            focus-on-click: false;
+            icon-name: "glance-tool-highlight-symbolic";
+            tooltip-text: _("Highlight");
+            action-name: "win.markup-tool";
+            action-target: "'highlight'";
+          }
+
+          ToggleButton {
+            focus-on-click: false;
+            icon-name: "glance-tool-text-symbolic";
+            tooltip-text: _("Text");
+            action-name: "win.markup-tool";
+            action-target: "'text'";
+          }
+        }
+
+        Separator {}
+
+        Box swatches {
+          spacing: 2;
+        }
+
+        ColorDialogButton custom_color {
+          focus-on-click: false;
+          valign: center;
+          tooltip-text: _("Custom Colour");
+
+          dialog: ColorDialog {
+            with-alpha: false;
+          };
+        }
+
+        MenuButton {
+          focus-on-click: false;
+          icon-name: "glance-weight-symbolic";
+          tooltip-text: _("Line Width and Text Size");
+          menu-model: weight_menu;
+        }
+
+        Button {
+          focus-on-click: false;
+          icon-name: "user-trash-symbolic";
+          tooltip-text: _("Delete Shape");
+          action-name: "win.markup-delete";
+        }
+      }
+
       content: Stack stack {
         StackPage {
           name: "empty";
@@ -113,6 +223,28 @@ template $GlanceWindow: Adw.ApplicationWindow {
   };
 }
 
+menu weight_menu {
+  section {
+    item {
+      label: _("Thin");
+      action: "win.markup-weight";
+      target: "thin";
+    }
+
+    item {
+      label: _("Medium");
+      action: "win.markup-weight";
+      target: "medium";
+    }
+
+    item {
+      label: _("Thick");
+      action: "win.markup-weight";
+      target: "thick";
+    }
+  }
+}
+
 menu primary_menu {
   section {
     item (_("_Open…"), "win.open")
@@ -135,6 +267,7 @@ menu primary_menu {
   }
 
   section {
+    item (_("_Markup"), "win.markup")
     item (_("Ad_just Size…"), "win.adjust-size")
     item (_("_Crop to Selection"), "win.crop")
     item {

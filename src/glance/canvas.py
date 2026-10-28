@@ -2,9 +2,13 @@
 
 Mouse, as in Preview: drag on the image to select (Shift = square), drag inside the selection to move it,
 drag a handle to resize it, click outside to clear it. Scroll or middle-drag pans; Ctrl+scroll or pinch zooms.
+
+With markup on, shapes (markup.py) are drawn live as vectors over the image under the open markup layer.
+Click a shape to select it, drag to move, drag its handles to resize; a shape tool drags out a new one.
 """
 
 import math
+from dataclasses import replace
 
 import gi
 
@@ -14,6 +18,7 @@ gi.require_version("Gsk", "4.0")
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gdk, GLib, GObject, Graphene, Gsk, Gtk
 
+from . import markup
 from . import selection as sel
 
 MIN_ZOOM, MAX_ZOOM = 0.02, 64.0
@@ -64,7 +69,9 @@ class Canvas(Gtk.Widget):
     __gtype_name__ = "GlanceCanvas"
     __gsignals__ = {
         "zoom-changed": (GObject.SignalFlags.RUN_FIRST, None, ()),
-        "selection-changed": (GObject.SignalFlags.RUN_FIRST, None, ()),
+        "selection-changed": (GObject.SignalFlags.RUN_FIRST, None, ()),  # crop selection or selected shape
+        "shapes-changed": (GObject.SignalFlags.RUN_FIRST, None, ()),  # a markup edit is finished: read .shapes
+        "text-requested": (GObject.SignalFlags.RUN_FIRST, None, (float, float, int)),  # x, y, index (-1 = new)
     }
 
     def __init__(self, **kwargs):
@@ -80,6 +87,14 @@ class Canvas(Gtk.Widget):
         self.selection = None  # sel.Rect in image pixels, or None
         self.ratio_name = "free"
         self._drag = None  # the selection gesture in progress: dict(mode=…)
+        self._image = None  # the Pillow image behind the texture
+        self.markup_enabled = False
+        self.tool = "select"
+        self.markup_color = markup.hex_to_rgba(markup.PALETTE[0][1])
+        self.markup_weight = "medium"
+        self.shapes = ()
+        self.selected_shape = None
+        self._live = None  # shapes while a markup drag is in progress
         self.set_hexpand(True)
         self.set_vexpand(True)
         self.set_focusable(True)
@@ -115,9 +130,14 @@ class Canvas(Gtk.Widget):
         keys.connect("key-pressed", self._on_key)
         self.add_controller(keys)
 
+        double = Gtk.GestureClick(button=Gdk.BUTTON_PRIMARY)
+        double.connect("pressed", self._on_click)
+        self.add_controller(double)
+
     # --- public -------------------------------------------------------------------------------
 
     def set_image(self, img, reset=True):
+        self._image = img
         self._texture = texture_from_image(img)
         self._has_alpha = img.mode == "RGBA"
         if reset:
@@ -126,6 +146,66 @@ class Canvas(Gtk.Widget):
         self.set_selection(None)
         self.queue_draw()
         self.emit("zoom-changed")
+
+    def show(self, img, shapes=()):
+        """Show img with the markup shapes over it, keeping the view (after an edit or undo)."""
+        if img is not self._image:
+            self.set_image(img, reset=False)
+        self.shapes = tuple(shapes)
+        if self.selected_shape is not None and self.selected_shape >= len(self.shapes):
+            self.selected_shape = None
+            self.emit("selection-changed")
+        self.queue_draw()
+
+    # --- markup editing ---------------------------------------------------------------------------
+
+    def style(self, kind):
+        base = markup.base_stroke(self.image_size)
+        size = base * markup.TEXT_SIZES[self.markup_weight]
+        return dict(color=self.markup_color, width=base * markup.WIDTHS[self.markup_weight],
+                    **({"size": size} if kind == "text" else {}))
+
+    def select_shape(self, index):
+        if index != self.selected_shape:
+            self.selected_shape = index
+            self.queue_draw()
+            self.emit("selection-changed")
+
+    def _commit(self, shapes, select=None):
+        self.shapes = tuple(shapes)
+        self._live = None
+        self.selected_shape = select
+        self.queue_draw()
+        self.emit("selection-changed")
+        self.emit("shapes-changed")
+
+    def delete_selected(self):
+        if self.selected_shape is not None:
+            self._commit(self.shapes[:self.selected_shape] + self.shapes[self.selected_shape + 1:])
+
+    def restyle_selected(self):
+        """Give the selected shape the current colour and weight."""
+        i = self.selected_shape
+        if i is None:
+            return
+        old = self.shapes[i]
+        style = self.style(old.kind)
+        new = replace(old, **style)
+        if new != old:
+            self._commit(self.shapes[:i] + (new,) + self.shapes[i + 1:], select=i)
+
+    def commit_text(self, index, point, text):
+        """From the text editor: add (index -1), change or (empty text) delete a text shape."""
+        text = text.rstrip()
+        if index < 0:
+            if text:
+                shape = markup.Shape("text", tuple(point), tuple(point), text=text, **self.style("text"))
+                self._commit(self.shapes + (shape,), select=len(self.shapes))
+        elif not text:
+            self._commit(self.shapes[:index] + self.shapes[index + 1:])
+        elif text != self.shapes[index].text:
+            new = replace(self.shapes[index], text=text)
+            self._commit(self.shapes[:index] + (new,) + self.shapes[index + 1:], select=index)
 
     @property
     def zoom(self):
@@ -269,6 +349,14 @@ class Canvas(Gtk.Widget):
         filt = (Gsk.ScalingFilter.NEAREST if zoom >= 2 else
                 Gsk.ScalingFilter.LINEAR if zoom >= 1 else Gsk.ScalingFilter.TRILINEAR)
         snapshot.append_scaled_texture(self._texture, filt, bounds)
+        shapes = self._live if self._live is not None else self.shapes
+        if shapes:
+            cr = snapshot.append_cairo(bounds)  # clipped to the image, as in the saved file
+            cr.translate(x, y)
+            cr.scale(s, s)
+            markup.draw(cr, shapes)
+        if self.markup_enabled and self.selected_shape is not None and self.selected_shape < len(shapes):
+            self._draw_shape_handles(snapshot, shapes[self.selected_shape])
         if self.selection:
             self._draw_selection(snapshot, x, y, s)
 
@@ -300,6 +388,18 @@ class Canvas(Gtk.Widget):
         if self._drag:
             self._draw_badge(snapshot, f"{right - left} × {bottom - top}", x1, y1)
 
+    def _draw_shape_handles(self, snapshot, shape):
+        r = markup.bbox(shape)
+        x0, y0 = self.to_widget(r.x, r.y)
+        x1, y1 = self.to_widget(r.right, r.bottom)
+        if shape.kind not in ("line", "arrow"):
+            _border(snapshot, x0 - 1, y0 - 1, x1 - x0 + 2, y1 - y0 + 2, LINE_DARK)
+            _border(snapshot, x0, y0, x1 - x0, y1 - y0, LINE_LIGHT)
+        for hx, hy in markup.handles(shape).values():
+            wx, wy = self.to_widget(hx, hy)
+            snapshot.append_color(LINE_LIGHT, _rect(wx - HANDLE / 2, wy - HANDLE / 2, HANDLE, HANDLE))
+            _border(snapshot, wx - HANDLE / 2, wy - HANDLE / 2, HANDLE, HANDLE, LINE_DARK)
+
     def _draw_badge(self, snapshot, text, x, y):
         layout = self.create_pango_layout(text)
         tw, th = layout.get_pixel_size()
@@ -321,6 +421,9 @@ class Canvas(Gtk.Widget):
             return
         self.grab_focus()
         point = self.to_image(wx, wy)
+        if self.markup_enabled and self._begin_markup(wx, wy, point):
+            self._drag["origin"] = (wx, wy)
+            return
         handle = self._handle_at(wx, wy)
         if handle:
             ratio = sel.ratio_value(self.ratio_name, self.image_size)
@@ -333,12 +436,80 @@ class Canvas(Gtk.Widget):
             self._drag = dict(mode="new", anchor=point, moved=False)
         self._drag["origin"] = (wx, wy)
 
+    def _begin_markup(self, wx, wy, point):
+        """Start a markup gesture if (wx, wy) calls for one; False leaves it to the crop selection."""
+        if self.selected_shape is not None:
+            for name, (hx, hy) in markup.handles(self.shapes[self.selected_shape]).items():
+                hwx, hwy = self.to_widget(hx, hy)
+                if abs(wx - hwx) <= HANDLE_HIT and abs(wy - hwy) <= HANDLE_HIT:
+                    self._drag = dict(mode="shape-resize", handle=name, index=self.selected_shape,
+                                      shape=self.shapes[self.selected_shape], moved=False)
+                    return True
+        index = markup.shape_at(self.shapes, point, HANDLE_HIT / self._scale())
+        if index is not None:
+            self.select_shape(index)
+            self._drag = dict(mode="shape-move", index=index, shape=self.shapes[index], start=point, moved=False)
+            return True
+        self.select_shape(None)
+        if self.tool == "text":
+            self._drag = dict(mode="text-click", anchor=point, moved=False)
+            return True
+        if self.tool in markup.KINDS:
+            self._drag = dict(mode="shape-new", anchor=point, moved=False)
+            return True
+        return False
+
+    def _update_markup(self, drag, wx, wy, point, shift):
+        ox, oy = drag["origin"]
+        if not drag["moved"] and max(abs(wx - ox), abs(wy - oy)) < CLICK_SLOP:
+            return
+        drag["moved"] = True
+        if drag["mode"] == "text-click":
+            return
+        if drag["mode"] == "shape-new":
+            ax, ay = drag["anchor"]
+            dx, dy = point[0] - ax, point[1] - ay
+            if shift and self.tool in ("rect", "ellipse", "highlight"):  # square / circle
+                side = max(abs(dx), abs(dy))
+                point = (ax + math.copysign(side, dx), ay + math.copysign(side, dy))
+            elif shift and self.tool in ("line", "arrow"):  # snap to 45°
+                angle = round(math.atan2(dy, dx) / (math.pi / 4)) * (math.pi / 4)
+                length = math.hypot(dx, dy)
+                point = (ax + length * math.cos(angle), ay + length * math.sin(angle))
+            new = markup.from_drag(self.tool, drag["anchor"], point, self.style(self.tool))
+            self._live = self.shapes + (new,)
+        else:
+            i, shape = drag["index"], drag["shape"]
+            if drag["mode"] == "shape-move":
+                new = shape.moved(point[0] - drag["start"][0], point[1] - drag["start"][1])
+            else:
+                new = markup.resized(shape, drag["handle"], point, self.image_size)
+            self._live = self.shapes[:i] + (new,) + self.shapes[i + 1:]
+        self.queue_draw()
+
+    def _end_markup(self, drag):
+        live, self._live = self._live, None
+        if drag["mode"] == "text-click":
+            if not drag["moved"]:
+                self.emit("text-requested", drag["anchor"][0], drag["anchor"][1], -1)
+        elif drag["moved"] and live is not None:
+            if drag["mode"] == "shape-new":
+                r = markup.bbox(live[-1])
+                if max(r.w, r.h) >= 2:  # ignore a stray twitch
+                    self._commit(live, select=len(live) - 1)
+            else:
+                self._commit(live, select=drag["index"])
+        self.queue_draw()
+
     def update_drag(self, wx, wy, shift=False):
         drag = self._drag
         if not drag:
             return
         point = self.to_image(wx, wy)
         bounds = self.image_size
+        if drag["mode"].startswith(("shape-", "text-")):
+            self._update_markup(drag, wx, wy, point, shift)
+            return
         if drag["mode"] == "new":
             ox, oy = drag["origin"]
             if not drag["moved"] and max(abs(wx - ox), abs(wy - oy)) < CLICK_SLOP:
@@ -357,6 +528,9 @@ class Canvas(Gtk.Widget):
 
     def end_drag(self):
         drag, self._drag = self._drag, None
+        if drag and drag["mode"].startswith(("shape-", "text-")):
+            self._end_markup(drag)
+            return
         if drag and drag["mode"] == "new" and not drag["moved"]:
             self.set_selection(None)  # a click clears the selection, as in Preview
         else:
@@ -369,6 +543,13 @@ class Canvas(Gtk.Widget):
 
     # --- other input --------------------------------------------------------------------------
 
+    def _on_click(self, _gesture, n_press, wx, wy):
+        if n_press == 2 and self.markup_enabled and self._texture:
+            index = markup.shape_at(self.shapes, self.to_image(wx, wy), HANDLE_HIT / self._scale())
+            if index is not None and self.shapes[index].kind == "text":
+                p = self.shapes[index].p0
+                self.emit("text-requested", p[0], p[1], index)
+
     def _on_motion(self, _controller, wx, wy):
         self._pointer = (wx, wy)
         if self._drag or self._pan_start or not self._texture:
@@ -376,6 +557,17 @@ class Canvas(Gtk.Widget):
         handle = self._handle_at(wx, wy)
         ix, iy = self.to_image(wx, wy)
         iw, ih = self.image_size
+        if self.markup_enabled:
+            over = markup.shape_at(self.shapes, (ix, iy), HANDLE_HIT / self._scale())
+            if over is not None:
+                self.set_cursor_from_name("move")
+                return
+            if self.tool == "text":
+                self.set_cursor_from_name("text")
+                return
+            if self.tool in markup.KINDS:
+                self.set_cursor_from_name("crosshair")
+                return
         if handle:
             name = HANDLE_CURSORS[handle]
         elif self.selection and self.selection.contains(ix, iy):
@@ -387,6 +579,13 @@ class Canvas(Gtk.Widget):
         self.set_cursor_from_name(name)
 
     def _on_key(self, _controller, keyval, _keycode, state):
+        if self.selected_shape is not None and self.markup_enabled:
+            if keyval in (Gdk.KEY_Delete, Gdk.KEY_BackSpace, Gdk.KEY_KP_Delete):
+                self.delete_selected()
+                return True
+            if keyval == Gdk.KEY_Escape:
+                self.select_shape(None)
+                return True
         if keyval == Gdk.KEY_Escape and self.selection:
             self.set_selection(None)
             return True

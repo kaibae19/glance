@@ -12,7 +12,7 @@ gnome.compile_resources('glance', 'glance.gresource.xml',
 )
 
 install_data(
-  files('__init__.py', 'adjust_size.py', 'canvas.py', 'document.py', 'estimate.py', 'export.py', 'imageio.py', 'main.py', 'ops.py',
+  files('__init__.py', 'adjust_size.py', 'canvas.py', 'document.py', 'estimate.py', 'export.py', 'imageio.py', 'main.py', 'markup.py', 'ops.py',
         'selection.py', 'shortcuts.py', 'sizing.py', 'window.py'),
   install_dir: pkgdatadir / 'glance',
 )

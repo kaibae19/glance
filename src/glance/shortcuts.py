@@ -19,6 +19,7 @@ APP = {
     "win.zoom-actual": ["<Control>0", "<Control>KP_0"],
     "win.zoom-fit": ["<Control>9"],
     "win.crop": ["<Control>k"],  # Preview: Crop
+    "win.markup": ["<Control><Shift>a"],  # Preview: Show Markup Toolbar
     "win.adjust-size": ["<Control><Alt>i"],  # Preview has none by default (design doc §6)
     "win.rotate-left": ["<Control>l"],
     "win.rotate-right": ["<Control>r"],

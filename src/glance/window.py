@@ -3,6 +3,8 @@ import threading
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
+from . import markup
+
 from . import imageio, shortcuts
 from .adjust_size import AdjustSizeDialog
 from .export import ExportDialog
@@ -10,7 +12,8 @@ from .canvas import Canvas  # noqa: F401  registers GlanceCanvas for the templat
 from .document import AnimatedImageError, Document
 from .ops import Crop, Flip, Rotate
 
-DOC_ACTIONS = ["save", "save-as", "export", "adjust-size", "crop", "select-all", "zoom-in", "zoom-out", "zoom-actual", "zoom-fit", "rotate-left",
+DOC_ACTIONS = ["save", "save-as", "export", "markup", "markup-tool", "markup-color", "markup-weight",
+               "adjust-size", "crop", "select-all", "zoom-in", "zoom-out", "zoom-actual", "zoom-fit", "rotate-left",
                "rotate-right", "flip-horizontal", "flip-vertical", "previous", "next", "info"]
 
 
@@ -24,6 +27,9 @@ class GlanceWindow(Adw.ApplicationWindow):
     canvas = Gtk.Template.Child()
     info_button = Gtk.Template.Child()
     info_grid = Gtk.Template.Child()
+    markup_bar = Gtk.Template.Child()
+    swatches = Gtk.Template.Child()
+    custom_color = Gtk.Template.Child()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -40,6 +46,9 @@ class GlanceWindow(Adw.ApplicationWindow):
         self.add_controller(drop)
         self.canvas.connect("zoom-changed", lambda *_: self._update_title())
         self.canvas.connect("selection-changed", lambda *_: self._update_state())
+        self.canvas.connect("shapes-changed", self._on_shapes_changed)
+        self.canvas.connect("text-requested", self._on_text_requested)
+        self._build_swatches()
         self.connect("close-request", self._on_close_request)
         self._update_state()
 
@@ -75,14 +84,106 @@ class GlanceWindow(Adw.ApplicationWindow):
             action.connect("activate", lambda _a, _p, h=handler: h())
             self.add_action(action)
 
-        ratio = Gio.SimpleAction.new_stateful("selection-ratio", GLib.VariantType.new("s"),
-                                              GLib.Variant("s", "free"))
-        ratio.connect("change-state", self._on_ratio)
-        self.add_action(ratio)
+        stateful = {
+            "selection-ratio": GLib.Variant("s", "free"),
+            "markup": GLib.Variant("b", False),
+            "markup-tool": GLib.Variant("s", "select"),
+            "markup-color": GLib.Variant("s", markup.PALETTE[0][1]),
+            "markup-weight": GLib.Variant("s", "medium"),
+        }
+        for name, initial in stateful.items():
+            vtype = None if name == "markup" else GLib.VariantType.new("s")
+            action = Gio.SimpleAction.new_stateful(name, vtype, initial)
+            action.connect("change-state", getattr(self, "_on_" + name.replace("-", "_")))
+            self.add_action(action)
+        delete = Gio.SimpleAction.new("markup-delete", None)
+        delete.connect("activate", lambda *_: self.canvas.delete_selected())
+        self.add_action(delete)
 
-    def _on_ratio(self, action, value):
+    def _on_selection_ratio(self, action, value):
         action.set_state(value)
         self.canvas.set_ratio(value.get_string())
+
+    # --- markup -------------------------------------------------------------------------------
+
+    def _on_markup(self, action, value):
+        action.set_state(value)
+        on = value.get_boolean()
+        self.markup_bar.set_visible(on)
+        self.canvas.markup_enabled = on
+        if not on:
+            self.canvas.select_shape(None)
+        self.canvas.queue_draw()
+
+    def _on_markup_tool(self, action, value):
+        action.set_state(value)
+        self.canvas.tool = value.get_string()
+        if not self.canvas.markup_enabled:
+            self.activate_action("win.markup", None)
+
+    def _on_markup_color(self, action, value):
+        action.set_state(value)
+        self.canvas.markup_color = markup.hex_to_rgba(value.get_string())
+        self.canvas.restyle_selected()
+
+    def _on_markup_weight(self, action, value):
+        action.set_state(value)
+        self.canvas.markup_weight = value.get_string()
+        self.canvas.restyle_selected()
+
+    def _build_swatches(self):
+        css = []
+        for name, spec in markup.PALETTE:
+            key = name.lower()
+            dot = Gtk.Box(css_classes=["swatch-dot", f"swatch-{key}"], width_request=16, height_request=16)
+            button = Gtk.ToggleButton(child=dot, tooltip_text=name, focus_on_click=False,
+                                      action_name="win.markup-color",
+                                      action_target=GLib.Variant("s", spec), css_classes=["flat", "circular"])
+            self.swatches.append(button)
+            css.append(f".swatch-{key} {{ background: {spec}; }}")
+        css.append(".swatch-dot { border-radius: 999px; box-shadow: inset 0 0 0 1px alpha(black, 0.25); }")
+        provider = Gtk.CssProvider()
+        provider.load_from_string("\n".join(css))
+        Gtk.StyleContext.add_provider_for_display(self.get_display(), provider,
+                                                  Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self.custom_color.connect("notify::rgba", self._on_custom_color)
+
+    def _on_custom_color(self, button, _pspec):
+        c = button.get_rgba()
+        spec = "#" + "".join(f"{round(v * 255):02x}" for v in (c.red, c.green, c.blue))
+        self.activate_action("win.markup-color", GLib.Variant("s", spec))
+
+    def _on_shapes_changed(self, canvas):
+        doc = self.document
+        if not doc:
+            return
+        shapes = canvas.shapes
+        if doc.open_markup is not None:
+            doc.amend(markup.Annotate(shapes) if shapes else None)
+        elif shapes:
+            doc.apply(markup.Annotate(shapes))
+
+    def _on_text_requested(self, canvas, x, y, index):
+        existing = canvas.shapes[index] if index >= 0 else None
+        entry = Gtk.Entry(text=existing.text if existing else "", placeholder_text="Text", width_chars=28)
+        popover = Gtk.Popover(child=entry, position=Gtk.PositionType.BOTTOM)
+        popover.set_parent(canvas)
+        wx, wy = canvas.to_widget(x, y)
+        target = Gdk.Rectangle()
+        target.x, target.y, target.width, target.height = int(wx), int(wy), 1, 1
+        popover.set_pointing_to(target)
+        committed = []
+
+        def commit(*_args):
+            if not committed:  # Enter, then the popover closing: commit once
+                committed.append(True)
+                canvas.commit_text(index, (x, y), entry.get_text())
+                popover.popdown()
+
+        entry.connect("activate", commit)
+        popover.connect("closed", lambda p: (commit(), GLib.idle_add(p.unparent)))
+        popover.popup()
+        entry.grab_focus()
 
     def _enable(self, name, enabled):
         self.lookup_action(name).set_enabled(enabled)
@@ -93,6 +194,8 @@ class GlanceWindow(Adw.ApplicationWindow):
             self._enable(name, doc is not None)
         self._enable("save", bool(doc and doc.dirty))
         self._enable("crop", bool(doc and self.canvas.selection))
+        self._enable("markup-delete", bool(doc and self.canvas.markup_enabled
+                                          and self.canvas.selected_shape is not None))
         self._enable("undo", bool(doc and doc.can_undo))
         self._enable("redo", bool(doc and doc.can_redo))
         index = self._sibling_index()
@@ -179,6 +282,7 @@ class GlanceWindow(Adw.ApplicationWindow):
         doc.connect(self._on_document_changed)
         self._siblings = imageio.sibling_images(path)
         self.canvas.set_image(doc.image)
+        self.canvas.select_shape(None)
         self.stack.set_visible_child_name("image")
         self.canvas.grab_focus()
         self._fill_info()
@@ -221,7 +325,8 @@ class GlanceWindow(Adw.ApplicationWindow):
             AdjustSizeDialog(self.document, self._apply).present(self)
 
     def _on_document_changed(self, doc):
-        self.canvas.set_image(doc.image, reset=False)
+        layer = doc.open_markup
+        self.canvas.show(doc.base_image, layer.shapes if layer else ())
         self._fill_info()
         self._update_state()
 

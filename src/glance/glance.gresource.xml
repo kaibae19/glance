@@ -4,5 +4,14 @@
     <file preprocess="xml-stripblanks">adjust_size.ui</file>
     <file preprocess="xml-stripblanks">export.ui</file>
     <file preprocess="xml-stripblanks">window.ui</file>
+    <file alias="icons/scalable/actions/glance-markup-symbolic.svg">icons/glance-markup-symbolic.svg</file>
+    <file alias="icons/scalable/actions/glance-tool-arrow-symbolic.svg">icons/glance-tool-arrow-symbolic.svg</file>
+    <file alias="icons/scalable/actions/glance-tool-ellipse-symbolic.svg">icons/glance-tool-ellipse-symbolic.svg</file>
+    <file alias="icons/scalable/actions/glance-tool-highlight-symbolic.svg">icons/glance-tool-highlight-symbolic.svg</file>
+    <file alias="icons/scalable/actions/glance-tool-line-symbolic.svg">icons/glance-tool-line-symbolic.svg</file>
+    <file alias="icons/scalable/actions/glance-tool-rect-symbolic.svg">icons/glance-tool-rect-symbolic.svg</file>
+    <file alias="icons/scalable/actions/glance-tool-select-symbolic.svg">icons/glance-tool-select-symbolic.svg</file>
+    <file alias="icons/scalable/actions/glance-tool-text-symbolic.svg">icons/glance-tool-text-symbolic.svg</file>
+    <file alias="icons/scalable/actions/glance-weight-symbolic.svg">icons/glance-weight-symbolic.svg</file>
   </gresource>
 </gresources>
