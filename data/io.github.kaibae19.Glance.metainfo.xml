@@ -43,6 +43,10 @@
   </branding>
   <screenshots>
     <screenshot type="default">
+      <image>https://raw.githubusercontent.com/kaibae19/glance/main/docs/screenshots/desktop.png</image>
+      <caption>A large photo fitted to the window, with the main menu (photo: Alex Moliski, Unsplash)</caption>
+    </screenshot>
+    <screenshot>
       <image>https://raw.githubusercontent.com/kaibae19/glance/main/docs/screenshots/markup.png</image>
       <caption>Marking up a screenshot</caption>
     </screenshot>
