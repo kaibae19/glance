@@ -17,6 +17,7 @@
       <li>Rotate and flip without losing quality until you save</li>
       <li>Export to PNG, JPEG, WebP, TIFF, GIF or BMP, with quality and transparency options, and strip metadata</li>
       <li>Mark up screenshots with rectangles, ovals, lines, arrows, highlights and text, editable until you move on</li>
+      <li>Read PDFs, and reorder, rotate, delete and insert pages, or merge PDFs by dropping them on the sidebar</li>
     </ul>
   </description>
   <developer id="io.github.kaibae19">
