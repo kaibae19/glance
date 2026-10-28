@@ -7,7 +7,9 @@ import shutil
 import tempfile
 from dataclasses import dataclass
 
-from PIL import Image, ImageCms, ImageOps
+from PIL import Image, ImageCms, ImageOps, features
+
+Image.init()  # fills Image.SAVE / Image.OPEN; until then they hold only what has been used
 
 EXIF_ORIENTATION = 0x0112
 EXIF_MAKE = 0x010F
@@ -17,6 +19,45 @@ EXIF_DATE_TAKEN = 0x9003
 
 # Formats that can't store an alpha channel; RGBA is flattened onto white before saving.
 NO_ALPHA = {"JPEG", "BMP", "PCX", "PPM", "EPS"}
+
+
+@dataclass(frozen=True)
+class ExportFormat:
+    name: str  # Pillow's
+    label: str
+    extension: str
+    lossy: bool
+    alpha: bool
+    note: str = ""
+
+
+EXPORT_FORMATS = [
+    ExportFormat("PNG", "PNG", ".png", lossy=False, alpha=True),
+    ExportFormat("JPEG", "JPEG", ".jpg", lossy=True, alpha=False),
+    ExportFormat("WEBP", "WebP", ".webp", lossy=True, alpha=True),
+    ExportFormat("AVIF", "AVIF", ".avif", lossy=True, alpha=True),
+    ExportFormat("TIFF", "TIFF", ".tiff", lossy=False, alpha=True),
+    ExportFormat("GIF", "GIF", ".gif", lossy=False, alpha=True,
+                 note="256 colours; transparency is on or off per pixel"),
+    ExportFormat("BMP", "BMP", ".bmp", lossy=False, alpha=False),
+]
+_CODEC = {"WEBP": "webp", "AVIF": "avif", "JPEG": "jpg"}
+
+
+def export_formats():
+    """The EXPORT_FORMATS this Pillow build can write."""
+    return [f for f in EXPORT_FORMATS
+            if f.name in Image.SAVE and (f.name not in _CODEC or features.check(_CODEC[f.name]))]
+
+
+@dataclass(frozen=True)
+class ExportOptions:
+    format: str
+    quality: int = 90  # lossy formats
+    lossless: bool = False  # WebP
+    keep_alpha: bool = True  # off, or a format without alpha: flatten onto background
+    background: tuple[int, int, int] = (255, 255, 255)
+    strip_metadata: bool = False  # drops EXIF (camera, place, dates); keeps the colour profile
 
 
 @dataclass
@@ -120,31 +161,45 @@ def describe(path, img, info, dpi=None):
     return rows
 
 
-def _prepare(img, info, fmt, dpi=None):
-    """The image and Image.save() parameters for writing img as fmt."""
+def _flatten(img, background):
+    out = Image.new("RGB", img.size, background)
+    out.paste(img, mask=img.getchannel("A"))
+    return out
+
+
+def _prepare(img, info, fmt, dpi=None, options=None):
+    """The image and Image.save() parameters for writing img as fmt (Save) or with options (Export)."""
     out = img
-    if fmt in NO_ALPHA and img.mode == "RGBA":
-        out = Image.new("RGB", img.size, "white")
-        out.paste(img, mask=img.getchannel("A"))
+    keeps_alpha = fmt not in NO_ALPHA and (options is None or options.keep_alpha)
+    if img.mode == "RGBA" and not keeps_alpha:
+        out = _flatten(img, options.background if options else (255, 255, 255))
     params = {}
     dpi = dpi or (info.dpi if info else None)
     if info and info.icc_profile:
         params["icc_profile"] = info.icc_profile
-    if info and info.exif and fmt in ("JPEG", "PNG", "WEBP", "TIFF"):
+    strip = options is not None and options.strip_metadata
+    if info and info.exif and not strip and fmt in ("JPEG", "PNG", "WEBP", "TIFF", "AVIF"):
         params["exif"] = info.exif.tobytes()
     if dpi and fmt in ("JPEG", "PNG", "TIFF", "BMP"):
         params["dpi"] = dpi
+    quality = options.quality if options else 95
     if fmt == "JPEG":
-        params["quality"] = 95
+        params["quality"] = quality
+    elif fmt == "WEBP":
+        params.update(quality=quality, lossless=bool(options and options.lossless), method=4)
+    elif fmt == "AVIF":
+        params["quality"] = quality
+    elif fmt == "TIFF" and options:
+        params["compression"] = "tiff_lzw"
     return out, params
 
 
-def encoded_size(img, info, fmt=None, dpi=None):
+def encoded_size(img, info, fmt=None, dpi=None, options=None):
     """Bytes img would take on disk as fmt (default: the file's own format), or None if unknown."""
-    fmt = fmt or (info.format if info else None)
+    fmt = options.format if options else fmt or (info.format if info else None)
     if fmt not in Image.SAVE:
         return None
-    out, params = _prepare(img, info, fmt, dpi)
+    out, params = _prepare(img, info, fmt, dpi, options)
     buf = io.BytesIO()
     out.save(buf, format=fmt, **params)
     return buf.tell()
@@ -160,7 +215,18 @@ def save(img, path, info, fmt=None, dpi=None):
     if fmt is None:
         raise ValueError(f"no image format for {os.path.basename(path)}")
     out, params = _prepare(img, info, fmt, dpi)
+    _write(out, path, fmt, params)
+    return fmt
 
+
+def export(img, path, info, options, dpi=None):
+    """Write a copy of img as options.format (Export). The document keeps its own file."""
+    out, params = _prepare(img, info, options.format, dpi, options)
+    _write(out, path, options.format, params)
+
+
+def _write(out, path, fmt, params):
+    """Save atomically: a temp file in the same folder, then rename over path."""
     path = os.path.abspath(path)
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".glance-",
                                suffix=os.path.splitext(path)[1])
@@ -176,7 +242,6 @@ def save(img, path, info, fmt=None, dpi=None):
         if os.path.exists(tmp):
             os.unlink(tmp)
         raise
-    return fmt
 
 
 def _umask():

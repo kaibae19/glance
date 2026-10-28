@@ -79,6 +79,11 @@ class Document:
             self._renders.append(op.apply(self.image))
             self._changed()
 
+    def export(self, path, options):
+        """Write a copy (File → Export). The document keeps its path and its unsaved state; animated images
+        export their first frame."""
+        imageio.export(self.image, path, self.info, options, dpi=self.dpi)
+
     def save(self, path=None):
         """Save over the original (path=None) or to a new path (Save As), which becomes the document's path."""
         target = path or self.path
