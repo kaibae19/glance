@@ -135,13 +135,16 @@ class GlanceWindow(Adw.ApplicationWindow):
         css = []
         for name, spec in markup.PALETTE:
             key = name.lower()
-            dot = Gtk.Box(css_classes=["swatch-dot", f"swatch-{key}"], width_request=16, height_request=16)
-            button = Gtk.ToggleButton(child=dot, tooltip_text=name, focus_on_click=False,
+            dot = Gtk.Box(css_classes=["swatch-dot", f"swatch-{key}"], width_request=14, height_request=14,
+                          halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER)
+            button = Gtk.ToggleButton(child=dot, tooltip_text=name, focus_on_click=False, valign=Gtk.Align.CENTER,
                                       action_name="win.markup-color",
-                                      action_target=GLib.Variant("s", spec), css_classes=["flat", "circular"])
+                                      action_target=GLib.Variant("s", spec), css_classes=["flat", "swatch"])
             self.swatches.append(button)
             css.append(f".swatch-{key} {{ background: {spec}; }}")
         css.append(".swatch-dot { border-radius: 999px; box-shadow: inset 0 0 0 1px alpha(black, 0.25); }")
+        css.append("button.swatch { min-width: 22px; min-height: 22px; padding: 2px; border-radius: 999px; }")
+        css.append("button.swatch:checked { box-shadow: inset 0 0 0 2px @accent_color; background: none; }")
         provider = Gtk.CssProvider()
         provider.load_from_string("\n".join(css))
         Gtk.StyleContext.add_provider_for_display(self.get_display(), provider,
