@@ -5,11 +5,12 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 from . import imageio, shortcuts
 from .adjust_size import AdjustSizeDialog
+from .export import ExportDialog
 from .canvas import Canvas  # noqa: F401  registers GlanceCanvas for the template
 from .document import AnimatedImageError, Document
 from .ops import Crop, Flip, Rotate
 
-DOC_ACTIONS = ["save", "save-as", "adjust-size", "crop", "select-all", "zoom-in", "zoom-out", "zoom-actual", "zoom-fit", "rotate-left",
+DOC_ACTIONS = ["save", "save-as", "export", "adjust-size", "crop", "select-all", "zoom-in", "zoom-out", "zoom-actual", "zoom-fit", "rotate-left",
                "rotate-right", "flip-horizontal", "flip-vertical", "previous", "next", "info"]
 
 
@@ -49,6 +50,7 @@ class GlanceWindow(Adw.ApplicationWindow):
             "open": self.on_open,
             "save": self.on_save,
             "save-as": self.on_save_as,
+            "export": self.on_export,
             "adjust-size": self.on_adjust_size,
             "crop": self.on_crop,
             "select-all": self.canvas.select_all,
@@ -300,6 +302,69 @@ class GlanceWindow(Adw.ApplicationWindow):
         self._update_state()
         if then:
             then()
+
+    # --- export -------------------------------------------------------------------------------
+
+    def on_export(self):
+        if self.document:
+            app = self.get_application()
+            ExportDialog(self.document, getattr(app, "export_defaults", None), self._choose_export_path).present(self)
+
+    def _choose_export_path(self, options):
+        self.get_application().export_defaults = options  # remembered for this run (GSettings later)
+        doc = self.document
+        fmt = next(f for f in imageio.export_formats() if f.name == options.format)
+        stem = os.path.splitext(os.path.basename(doc.path))[0]
+        dialog = Gtk.FileDialog(title="Export", initial_name=stem + fmt.extension,
+                                initial_folder=Gio.File.new_for_path(os.path.dirname(doc.path)))
+
+        def on_chosen(_dialog, result):
+            try:
+                path = dialog.save_finish(result).get_path()
+            except GLib.Error:
+                return
+            if imageio.format_for_path(path) != options.format:
+                # The format picked on the sheet wins; the chooser only confirmed the name it was given.
+                path = os.path.splitext(path)[0] + fmt.extension
+                if os.path.exists(path):
+                    self._confirm_replace(path, lambda: self._export(path, options))
+                    return
+            self._export(path, options)
+
+        dialog.save(self, None, on_chosen)
+
+    def _confirm_replace(self, path, then):
+        dialog = Adw.AlertDialog(heading=f"Replace “{os.path.basename(path)}”?",
+                                 body="A file with that name already exists in this folder.")
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("replace", "Replace")
+        dialog.set_response_appearance("replace", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_close_response("cancel")
+        dialog.connect("response", lambda _d, r: then() if r == "replace" else None)
+        dialog.present(self)
+
+    def _export(self, path, options):
+        doc = self.document
+
+        def work():
+            try:
+                doc.export(path, options)
+                error = None
+            except Exception as e:
+                error = e
+            GLib.idle_add(self._exported, path, error)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _exported(self, path, error):
+        if error:
+            self.toast(f"Couldn't export: {error}")
+        else:
+            self.toast(f"Exported “{os.path.basename(path)}”")
+            if self.document and os.path.dirname(path) == os.path.dirname(self.document.path):
+                self._siblings = imageio.sibling_images(self.document.path)
+                self._update_state()
+        return False
 
     def _confirm_discard(self, then):
         """Run then() now, or after the user saves or discards unsaved edits."""

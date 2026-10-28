@@ -2,6 +2,7 @@
 <gresources>
   <gresource prefix="/io/github/kaibae19/Glance">
     <file preprocess="xml-stripblanks">adjust_size.ui</file>
+    <file preprocess="xml-stripblanks">export.ui</file>
     <file preprocess="xml-stripblanks">window.ui</file>
   </gresource>
 </gresources>

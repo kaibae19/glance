@@ -1,14 +1,11 @@
 """Tools → Adjust Size, after Preview's sheet. The arithmetic lives in sizing.py."""
 
-import threading
-
 from gi.repository import Adw, Gdk, GLib, Gtk
 
 from . import imageio
+from .estimate import Estimator
 from .ops import Resize
 from .sizing import DEFAULT_DPI, METHODS, PHYSICAL, PRESETS, UNITS, SizeModel
-
-ESTIMATE_DELAY_MS = 250
 
 
 @Gtk.Template(resource_path="/io/github/kaibae19/Glance/adjust_size.ui")
@@ -33,8 +30,7 @@ class AdjustSizeDialog(Adw.Dialog):
         w, h = document.size
         self.model = SizeModel(w, h, document.dpi[0] if document.dpi else DEFAULT_DPI)
         self._syncing = False
-        self._estimate_seq = 0
-        self._estimate_timer = 0
+        self._estimator = Estimator(self._show_estimate)
 
         self.fit_row.set_model(Gtk.StringList.new(["Custom"] + [f"{pw} × {ph}" for pw, ph in PRESETS]))
         self.unit_row.set_model(Gtk.StringList.new([u.capitalize() for u in UNITS]))
@@ -136,33 +132,15 @@ class AdjustSizeDialog(Adw.Dialog):
     def _update_result(self):
         w, h = self.model.size()
         self.result_row.set_subtitle(f"{w} × {h} px")
-        self._estimate_seq += 1  # an estimate still running is for the old settings
-        if self._estimate_timer:
-            GLib.source_remove(self._estimate_timer)
-        self._estimate_timer = GLib.timeout_add(ESTIMATE_DELAY_MS, self._start_estimate)
-
-    def _start_estimate(self):
-        self._estimate_timer = 0
-        self._estimate_seq += 1
-        seq, op, doc = self._estimate_seq, self._op(), self._document
+        op, doc = self._op(), self._document
         image, dpi = doc.image, (op.dpi if op and op.dpi else doc.dpi)
+        self._estimator.schedule(
+            lambda: imageio.encoded_size(op.apply(image) if op else image, doc.info, dpi=dpi))
 
-        def work():
-            try:
-                size = imageio.encoded_size(op.apply(image) if op else image, doc.info, dpi=dpi)
-            except Exception:  # an estimate is optional
-                size = None
-            GLib.idle_add(self._show_estimate, seq, size)
-
-        threading.Thread(target=work, daemon=True).start()
-        return False
-
-    def _show_estimate(self, seq, size):
-        if seq == self._estimate_seq and size:
-            w, h = self.model.size()
-            was = imageio.format_size(self._document.info.file_size)
-            self.result_row.set_subtitle(f"{w} × {h} px · about {imageio.format_size(size)} (was {was})")
-        return False
+    def _show_estimate(self, size):
+        w, h = self.model.size()
+        was = imageio.format_size(self._document.info.file_size)
+        self.result_row.set_subtitle(f"{w} × {h} px · about {imageio.format_size(size)} (was {was})")
 
     # --- closing ------------------------------------------------------------------------------
 
@@ -184,7 +162,4 @@ class AdjustSizeDialog(Adw.Dialog):
         self.close()
 
     def _on_closed(self, *_args):
-        if self._estimate_timer:
-            GLib.source_remove(self._estimate_timer)
-            self._estimate_timer = 0
-        self._estimate_seq += 1  # drop any estimate still running
+        self._estimator.cancel()

@@ -1,0 +1,110 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $GlanceExportDialog: Adw.Dialog {
+  title: _("Export");
+  content-width: 460;
+  default-widget: export_button;
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      show-start-title-buttons: false;
+      show-end-title-buttons: false;
+
+      [start]
+      Button {
+        label: _("Cancel");
+        clicked => $on_cancel();
+      }
+
+      [end]
+      Button export_button {
+        label: _("Export…");
+        clicked => $on_export();
+
+        styles [
+          "suggested-action",
+        ]
+      }
+    }
+
+    content: Adw.PreferencesPage {
+      Adw.PreferencesGroup {
+        Adw.ComboRow format_row {
+          title: _("Format");
+        }
+
+        Adw.ActionRow note_row {
+          title: _("Note");
+          visible: false;
+
+          styles [
+            "property",
+          ]
+        }
+
+        Adw.ActionRow quality_row {
+          title: _("Quality");
+
+          [suffix]
+          Scale quality_scale {
+            hexpand: true;
+            width-request: 200;
+            digits: 0;
+            draw-value: true;
+            value-pos: left;
+
+            adjustment: Adjustment {
+              lower: 1;
+              upper: 100;
+              step-increment: 1;
+              page-increment: 10;
+              value: 90;
+            };
+          }
+        }
+
+        Adw.SwitchRow lossless_row {
+          title: _("Lossless");
+          subtitle: _("Every pixel kept; larger file");
+        }
+
+        Adw.SwitchRow alpha_row {
+          title: _("Keep Transparency");
+          active: true;
+        }
+
+        Adw.ActionRow background_row {
+          title: _("Background");
+
+          [suffix]
+          ColorDialogButton background_button {
+            valign: center;
+
+            dialog: ColorDialog {
+              with-alpha: false;
+            };
+          }
+        }
+      }
+
+      Adw.PreferencesGroup {
+        Adw.SwitchRow strip_row {
+          title: _("Strip Metadata");
+        }
+      }
+
+      Adw.PreferencesGroup {
+        Adw.ActionRow result_row {
+          title: _("Resulting Size");
+          subtitle-selectable: true;
+
+          styles [
+            "property",
+          ]
+        }
+      }
+    };
+  };
+}
