@@ -160,3 +160,21 @@ class PdfDocument:
         self.path = target
         self._saved = self.pages
         self._changed()
+
+
+def describe(doc, current):
+    """Rows for the Info popover: [(label, value)]."""
+    rows = [("Name", os.path.basename(doc.path)), ("Pages", str(len(doc)))]
+    if len(doc):
+        w, h = doc.page_size(current)
+        rows.append((f"Page {current + 1}", f"{w:.0f} × {h:.0f} pt ({w / 72 * 25.4:.0f} × {h / 72 * 25.4:.0f} mm)"))
+    meta = doc.metadata or {}
+    for key, label in (("/Title", "Title"), ("/Author", "Author"), ("/Producer", "Producer")):
+        value = meta.get(key)
+        if isinstance(value, str) and value.strip():
+            rows.append((label, value.strip()))
+    try:
+        rows.append(("File size", imageio.format_size(os.path.getsize(doc.path))))
+    except OSError:
+        pass
+    return rows

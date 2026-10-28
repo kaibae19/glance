@@ -7,5 +7,5 @@ Terminal=false
 Type=Application
 Categories=Graphics;Viewer;GTK;GNOME;
 Keywords=image;photo;viewer;preview;resize;crop;
-MimeType=image/png;image/jpeg;image/webp;image/gif;image/tiff;image/bmp;image/x-icon;image/avif;
+MimeType=application/pdf;image/png;image/jpeg;image/webp;image/gif;image/tiff;image/bmp;image/x-icon;image/avif;
 StartupNotify=true

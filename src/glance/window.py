@@ -4,14 +4,13 @@ import threading
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Pango
 
-from . import markup
-
-from . import imageio, settings, shortcuts
+from . import imageio, markup, pdfdoc, settings, shortcuts
 from .adjust_size import AdjustSizeDialog
 from .export import ExportDialog
 from .canvas import Canvas  # noqa: F401  registers GlanceCanvas for the template
 from .document import AnimatedImageError, Document
 from .ops import Crop, Flip, Rotate
+from .pdfview import PAGE_GAP, THUMB_WIDTH, PdfView
 
 # Fitting the window to a newly opened image, as Preview does: at most this much of the monitor (room for
 # GNOME's top bar and dock), and at least big enough for the header bar's buttons.
@@ -20,7 +19,12 @@ FIT_MIN_W, FIT_MIN_H = 520, 360
 
 DOC_ACTIONS = ["save", "save-as", "export", "markup", "markup-tool", "markup-color", "markup-weight",
                "adjust-size", "crop", "select-all", "zoom-in", "zoom-out", "zoom-actual", "zoom-fit", "rotate-left",
-               "rotate-right", "flip-horizontal", "flip-vertical", "previous", "next", "info"]
+               "rotate-right", "flip-horizontal", "flip-vertical", "previous", "next", "info",
+               "insert-pages", "delete-pages"]
+# Image tools that don't apply to a PDF (yet): off while a PDF is open.
+IMAGE_ONLY = ["export", "markup", "markup-tool", "markup-color", "markup-weight", "adjust-size", "crop",
+              "flip-horizontal", "flip-vertical"]
+PDF_ONLY = ["insert-pages", "delete-pages"]
 
 
 @Gtk.Template(resource_path="/io/github/kaibae19/Glance/window.ui")
@@ -44,7 +48,14 @@ class GlanceWindow(Adw.ApplicationWindow):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.document = None
+        self.document = None  # an image Document, or None
+        self.pdf = None  # a pdfdoc.PdfDocument, or None (one of the two is open at a time)
+        self.pdf_view = PdfView()
+        self.stack.add_named(self.pdf_view, "pdf")
+        self.pdf_view.connect("zoom-changed", lambda *_: self._update_title())
+        self.pdf_view.connect("page-changed", lambda *_: (self._update_title(), self._fill_info()))
+        self.pdf_view.connect("selection-changed", lambda *_: self._update_state())
+        self.pdf_view.connect("files-dropped", self._on_pdf_files_dropped)
         self._siblings = []
         self._load_seq = 0
         self._fit_on_load = False
@@ -81,20 +92,22 @@ class GlanceWindow(Adw.ApplicationWindow):
             "export": self.on_export,
             "adjust-size": self.on_adjust_size,
             "crop": self.on_crop,
-            "select-all": self.canvas.select_all,
+            "select-all": lambda: self.pdf_view.selection.select_all() if self.pdf else self.canvas.select_all(),
             "close": self.close,
-            "undo": lambda: self.document and self.document.undo(),
-            "redo": lambda: self.document and self.document.redo(),
-            "zoom-in": self.canvas.zoom_in,
-            "zoom-out": self.canvas.zoom_out,
-            "zoom-actual": lambda: self.canvas.zoom_to(1.0),
-            "zoom-fit": self.canvas.zoom_fit,
-            "rotate-left": lambda: self._apply(Rotate(-1)),
-            "rotate-right": lambda: self._apply(Rotate(1)),
+            "undo": lambda: self._doc and self._doc.undo(),
+            "redo": lambda: self._doc and self._doc.redo(),
+            "zoom-in": lambda: self.pdf_view.zoom_in() if self.pdf else self.canvas.zoom_in(),
+            "zoom-out": lambda: self.pdf_view.zoom_out() if self.pdf else self.canvas.zoom_out(),
+            "zoom-actual": lambda: self.pdf_view.zoom_actual() if self.pdf else self.canvas.zoom_to(1.0),
+            "zoom-fit": lambda: self.pdf_view.zoom_fit() if self.pdf else self.canvas.zoom_fit(),
+            "rotate-left": lambda: self._rotate(-1),
+            "rotate-right": lambda: self._rotate(1),
+            "insert-pages": self.on_insert_pages,
+            "delete-pages": self.on_delete_pages,
             "flip-horizontal": lambda: self._apply(Flip(horizontal=True)),
             "flip-vertical": lambda: self._apply(Flip(horizontal=False)),
-            "previous": lambda: self._step(-1),
-            "next": lambda: self._step(1),
+            "previous": lambda: self.pdf_view.step(-1) if self.pdf else self._step(-1),
+            "next": lambda: self.pdf_view.step(1) if self.pdf else self._step(1),
             "fullscreen": lambda: self.unfullscreen() if self.is_fullscreen() else self.fullscreen(),
             "info": self.info_button.popup,
             "shortcuts": lambda: shortcuts.show_dialog(self),
@@ -265,10 +278,18 @@ class GlanceWindow(Adw.ApplicationWindow):
     def _enable(self, name, enabled):
         self.lookup_action(name).set_enabled(enabled)
 
+    @property
+    def _doc(self):
+        """The open document, image or PDF."""
+        return self.pdf or self.document
+
     def _update_state(self):
+        if self.pdf:
+            self._update_pdf_state()
+            return
         doc = self.document
         for name in DOC_ACTIONS:
-            self._enable(name, doc is not None)
+            self._enable(name, doc is not None and name not in PDF_ONLY)
         self._enable("save", bool(doc and doc.dirty))
         self._enable("crop", bool(doc and self.canvas.selection))
         self._enable("markup-delete", bool(doc and self.canvas.markup_enabled
@@ -281,7 +302,33 @@ class GlanceWindow(Adw.ApplicationWindow):
         self.info_button.set_sensitive(doc is not None)
         self._update_title()
 
+    def _update_pdf_state(self):
+        pdf = self.pdf
+        for name in DOC_ACTIONS:
+            self._enable(name, name not in IMAGE_ONLY)
+        self._enable("save", pdf.dirty)
+        self._enable("undo", pdf.can_undo)
+        self._enable("redo", pdf.can_redo)
+        self._enable("markup-delete", False)
+        self._enable("delete-pages", len(self.pdf_view.target_positions()) < len(pdf))
+        self._enable("previous", self.pdf_view.current_page > 0)
+        self._enable("next", self.pdf_view.current_page < len(pdf) - 1)
+        self.info_button.set_sensitive(True)
+        self._update_title()
+
     def _update_title(self):
+        if self.pdf:
+            name = os.path.basename(self.pdf.path)
+            title = f"{name} — Edited" if self.pdf.dirty else name
+            self.set_title(title)
+            self.window_title.set_title(title)
+            view = self.pdf_view
+            subtitle = f"Page {view.current_page + 1} of {len(self.pdf)} · {round(view.zoom * 100)}%"
+            selected = view.selected_positions()
+            if len(selected) > 1:
+                subtitle += f" · {len(selected)} pages selected"
+            self.window_title.set_subtitle(subtitle)
+            return
         doc = self.document
         if not doc:
             self.set_title("Glance")
@@ -305,14 +352,20 @@ class GlanceWindow(Adw.ApplicationWindow):
     # --- opening ------------------------------------------------------------------------------
 
     def on_open(self):
+        both = Gtk.FileFilter(name="Images and PDFs")
         images = Gtk.FileFilter(name="Images")
         for ext in sorted(imageio.readable_extensions()):
+            both.add_suffix(ext.lstrip("."))
             images.add_suffix(ext.lstrip("."))
+        pdfs = Gtk.FileFilter(name="PDF Documents")
+        for f in (both, pdfs):
+            f.add_suffix("pdf")
         filters = Gio.ListStore.new(Gtk.FileFilter)
-        filters.append(images)
-        dialog = Gtk.FileDialog(title="Open Image", filters=filters, default_filter=images)
-        if self.document:
-            dialog.set_initial_folder(Gio.File.new_for_path(os.path.dirname(self.document.path)))
+        for f in (both, images, pdfs):
+            filters.append(f)
+        dialog = Gtk.FileDialog(title="Open", filters=filters, default_filter=both)
+        if self._doc:
+            dialog.set_initial_folder(Gio.File.new_for_path(os.path.dirname(self._doc.path)))
         dialog.open(self, None, self._on_open_chosen)
 
     def _on_open_chosen(self, dialog, result):
@@ -355,8 +408,11 @@ class GlanceWindow(Adw.ApplicationWindow):
 
         def work():
             try:
-                doc, error = Document.open(path), None
-            except Exception as e:  # Pillow raises many types for bad files
+                opener = pdfdoc.PdfDocument.open if pdfdoc.is_pdf(path) else Document.open
+                doc, error = opener(path), None
+            except pdfdoc.EncryptedPdfError:
+                doc, error = None, "it is password-protected, which Glance can't open yet"
+            except Exception as e:  # Pillow and pypdf raise many types for bad files
                 doc, error = None, e
             GLib.idle_add(self._on_loaded, seq, path, doc, error)
 
@@ -369,8 +425,12 @@ class GlanceWindow(Adw.ApplicationWindow):
             self.toast(f"Couldn't open {os.path.basename(path)}: {error}")
             self._present_now()
             return False
-        self.document = doc
         self._overwrite_ok = False
+        if isinstance(doc, pdfdoc.PdfDocument):
+            self._show_pdf(doc)
+            return False
+        self.pdf = None
+        self.document = doc
         doc.connect(self._on_document_changed)
         self._siblings = imageio.sibling_images(path)
         self.canvas.set_image(doc.image)
@@ -386,8 +446,29 @@ class GlanceWindow(Adw.ApplicationWindow):
         self._present_now()
         return False
 
-    def _fit_window_to(self, size):
-        """Resize the window so the image shows at 100%, or as large as fits on the monitor."""
+    def _show_pdf(self, pdf):
+        self.document = None
+        self.pdf = pdf
+        self._siblings = []
+        if self.lookup_action("markup").get_state().get_boolean():
+            self.activate_action("win.markup", None)
+        pdf.connect(lambda _d: (self.pdf_view.reload(), self._fill_info(), self._update_state()))
+        self.pdf_view.set_document(pdf)
+        self.stack.set_visible_child_name("pdf")
+        self.pdf_view.pages.grab_focus()
+        self._fill_info()
+        self._update_state()
+        if self._fit_on_load:
+            pw, ph = pdf.page_size(0)
+            # 100% = one point per logical px, as Preview's Actual Size; the sidebar sits beside the page.
+            self._fit_window_to((pw + 2 * PAGE_GAP + 16, ph + 2 * PAGE_GAP), scale=1.0,
+                                extra_w=THUMB_WIDTH + 49)
+            self.pdf_view.zoom_fit()
+        self._present_now()
+
+    def _fit_window_to(self, size, scale=None, extra_w=0):
+        """Resize the window so the image shows at 100%, or as large as fits on the monitor. size is in image px
+        (device px at 100%) unless scale says otherwise; extra_w is fixed width beside it (the PDF sidebar)."""
         if self.is_maximized() or self.is_fullscreen():
             return
         display, surface = self.get_display(), self.get_surface() if self.get_mapped() else None
@@ -397,14 +478,18 @@ class GlanceWindow(Adw.ApplicationWindow):
         if monitor is None:
             return
         area = monitor.get_geometry()  # logical px; GTK has no work area on Wayland
-        scale = surface.get_scale() if surface else monitor.get_scale()
+        if scale is None:
+            scale = surface.get_scale() if surface else monitor.get_scale()
         chrome_w, chrome_h = self._chrome()
+        if not self.get_mapped() or self.stack.get_visible_child_name() != "pdf":
+            chrome_w += extra_w  # when mapped in PDF mode the sidebar is already outside the measured page area
         room_w = area.width * FIT_SCREEN_W - chrome_w
         room_h = area.height * FIT_SCREEN_H - chrome_h
         iw, ih = size[0] / scale, size[1] / scale  # 100% = one image px per device px, as in the canvas
         k = min(1.0, room_w / iw, room_h / ih)
         self.set_default_size(max(FIT_MIN_W, round(iw * k + chrome_w)), max(FIT_MIN_H, round(ih * k + chrome_h)))
-        self.canvas.zoom_fit()
+        if not self.pdf:
+            self.canvas.zoom_fit()
 
     def _chrome(self):
         """(w, h) around the image: header bar, markup bar when shown. Measured before the window is shown."""
@@ -436,6 +521,67 @@ class GlanceWindow(Adw.ApplicationWindow):
         if self.document:
             self.document.apply(op)
 
+    def _rotate(self, turns):
+        if self.pdf:
+            targets = self.pdf_view.target_positions()
+            self.pdf.rotate(targets, turns)
+            self.pdf_view.reload(select=self.pdf_view.selected_positions() and targets)
+        else:
+            self._apply(Rotate(turns))
+
+    # --- PDF pages ----------------------------------------------------------------------------
+
+    def on_delete_pages(self):
+        targets = self.pdf_view.target_positions()
+        if not self.pdf or not targets:
+            return
+        if len(targets) >= len(self.pdf):
+            self.toast("A PDF needs at least one page")
+            return
+        self.pdf.delete(targets)
+        self.toast(f"Deleted {len(targets)} page{'s' if len(targets) > 1 else ''}")
+
+    def on_insert_pages(self):
+        if not self.pdf:
+            return
+        pdfs = Gtk.FileFilter(name="PDF Documents")
+        pdfs.add_suffix("pdf")
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        filters.append(pdfs)
+        dialog = Gtk.FileDialog(title="Insert Pages from File", filters=filters, default_filter=pdfs,
+                                initial_folder=Gio.File.new_for_path(os.path.dirname(self.pdf.path)))
+
+        def on_chosen(_dialog, result):
+            try:
+                files = dialog.open_multiple_finish(result)
+            except GLib.Error:
+                return
+            paths = [files.get_item(i).get_path() for i in range(files.get_n_items())]
+            self.insert_pdfs(paths, self.pdf_view.current_page + 1)
+
+        dialog.open_multiple(self, None, on_chosen)
+
+    def _on_pdf_files_dropped(self, _view, paths, at):
+        self.insert_pdfs(paths, at)
+
+    def insert_pdfs(self, paths, at):
+        """Insert every page of each PDF in paths at position at (Insert from File, or a drop on the sidebar)."""
+        inserted, skipped = 0, []
+        for path in paths:
+            if not pdfdoc.is_pdf(path):
+                skipped.append(os.path.basename(path))
+                continue
+            try:
+                inserted += self.pdf.insert(at + inserted, path)
+            except Exception as e:
+                skipped.append(f"{os.path.basename(path)} ({e})")
+        if inserted:
+            self.pdf_view.reload(select=range(at, at + inserted))
+            self.pdf_view.go_to(at)
+            self.toast(f"Inserted {inserted} page{'s' if inserted > 1 else ''}")
+        if skipped:
+            self.toast("Not inserted (only PDFs can be): " + ", ".join(skipped))
+
     def on_crop(self):
         doc, rect = self.document, self.canvas.selection
         if not doc or not rect:
@@ -459,10 +605,14 @@ class GlanceWindow(Adw.ApplicationWindow):
     def _fill_info(self):
         while child := self.info_grid.get_first_child():
             self.info_grid.remove(child)
-        doc = self.document
-        if not doc:
+        if self.pdf:
+            rows = pdfdoc.describe(self.pdf, self.pdf_view.current_page)
+        elif self.document:
+            doc = self.document
+            rows = imageio.describe(doc.path, doc.image, doc.info, doc.dpi)
+        else:
             return
-        for row, (label, value) in enumerate(imageio.describe(doc.path, doc.image, doc.info, doc.dpi)):
+        for row, (label, value) in enumerate(rows):
             key = Gtk.Label(label=label, xalign=1, css_classes=["dim-label"])
             val = Gtk.Label(label=value, xalign=0, selectable=True, wrap=True, max_width_chars=40)
             self.info_grid.attach(key, 0, row, 1, 1)
@@ -473,7 +623,7 @@ class GlanceWindow(Adw.ApplicationWindow):
     # format (from the extension). Nothing is written without one of the two (no autosave).
 
     def on_save(self, then=None):
-        doc = self.document
+        doc = self._doc
         if not doc or not doc.dirty:
             return
         if self._overwrite_ok:
@@ -500,7 +650,7 @@ class GlanceWindow(Adw.ApplicationWindow):
         dialog.present(self)
 
     def on_save_as(self, then=None):
-        doc = self.document
+        doc = self._doc
         if not doc:
             return
         dialog = Gtk.FileDialog(title="Save As", initial_name=os.path.basename(doc.path),
@@ -511,7 +661,10 @@ class GlanceWindow(Adw.ApplicationWindow):
                 path = dialog.save_finish(result).get_path()
             except GLib.Error:
                 return
-            if imageio.format_for_path(path) is None:
+            if self.pdf:
+                if not path.lower().endswith(".pdf"):
+                    path += ".pdf"
+            elif imageio.format_for_path(path) is None:
                 self.toast(f"Glance can't save “{os.path.splitext(path)[1] or 'no extension'}” files")
                 return
             if path != doc.path:
@@ -522,14 +675,15 @@ class GlanceWindow(Adw.ApplicationWindow):
 
     def _save_to(self, path, then):
         try:
-            self.document.save(path)
+            self._doc.save(path)
         except AnimatedImageError:
             self.toast("Glance can't save animated images yet; nothing was written")
             return
         except Exception as e:
             self.toast(f"Couldn't save: {e}")
             return
-        self._siblings = imageio.sibling_images(self.document.path)
+        if self.document:
+            self._siblings = imageio.sibling_images(self.document.path)
         self._update_state()
         if then:
             then()
@@ -604,7 +758,7 @@ class GlanceWindow(Adw.ApplicationWindow):
 
     def _confirm_discard(self, then):
         """Run then() now, or after the user saves or discards unsaved edits."""
-        doc = self.document
+        doc = self._doc
         if not doc or not doc.dirty:
             then()
             return
@@ -649,7 +803,7 @@ class GlanceWindow(Adw.ApplicationWindow):
                 s.set_int("window-height", h)
 
     def _on_close_request(self, _window):
-        if self._closing or not (self.document and self.document.dirty):
+        if self._closing or not (self._doc and self._doc.dirty):
             self._save_window_state()
             return False
 
