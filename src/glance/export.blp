@@ -29,7 +29,15 @@ template $GlanceExportDialog: Adw.Dialog {
       }
     }
 
-    content: Adw.PreferencesPage {
+    // A plain box, not a scrolling PreferencesPage, so the sheet grows when a format shows more rows.
+    content: Box {
+      orientation: vertical;
+      spacing: 18;
+      margin-top: 12;
+      margin-bottom: 18;
+      margin-start: 12;
+      margin-end: 12;
+
       Adw.PreferencesGroup {
         Adw.ComboRow format_row {
           title: _("Format");
