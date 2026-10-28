@@ -478,8 +478,13 @@ def pdf_view(win):
     step(f"saved {os.path.basename(target)}: {texts}, rotations {rotations}; title {win.get_title()!r}")
     ok = (ok and texts == ["r3", "r0", "a0", "a1"] and rotations == [0, 90, 0, 0]
           and win.get_title() == "report-edited.pdf" and pdf_texts(report)[0] == ["r0", "r1", "r2", "r3"])
-    shoot(win, "pdf-edited.png")
     result["ok"] = result["ok"] and ok
+    view.go_to(0)
+    GLib.timeout_add(400, lambda: pdf_done(win))
+
+
+def pdf_done(win):
+    shoot(win, "pdf-edited.png")
     win.close()
     app.quit()
 
