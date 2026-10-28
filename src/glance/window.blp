@@ -12,6 +12,7 @@ template $GlanceWindow: Adw.ApplicationWindow {
       Adw.HeaderBar {
         [start]
         Button {
+          focus-on-click: false;
           icon-name: "document-open-symbolic";
           tooltip-text: _("Open…");
           action-name: "win.open";
@@ -23,6 +24,7 @@ template $GlanceWindow: Adw.ApplicationWindow {
 
         [end]
         MenuButton {
+          focus-on-click: false;
           primary: true;
           icon-name: "open-menu-symbolic";
           tooltip-text: _("Main Menu");
@@ -31,6 +33,7 @@ template $GlanceWindow: Adw.ApplicationWindow {
 
         [end]
         Button {
+          focus-on-click: false;
           icon-name: "object-rotate-left-symbolic";
           tooltip-text: _("Rotate Left");
           action-name: "win.rotate-left";
@@ -43,12 +46,16 @@ template $GlanceWindow: Adw.ApplicationWindow {
           ]
 
           Button {
+
+            focus-on-click: false;
             icon-name: "zoom-out-symbolic";
             tooltip-text: _("Zoom Out");
             action-name: "win.zoom-out";
           }
 
           Button {
+
+            focus-on-click: false;
             icon-name: "zoom-in-symbolic";
             tooltip-text: _("Zoom In");
             action-name: "win.zoom-in";
@@ -57,6 +64,7 @@ template $GlanceWindow: Adw.ApplicationWindow {
 
         [end]
         MenuButton info_button {
+          focus-on-click: false;
           icon-name: "help-about-symbolic";
           tooltip-text: _("Info");
 
@@ -113,14 +121,26 @@ menu primary_menu {
   }
 
   section {
-    item (_("_Undo"), "win.undo")
-    item (_("_Redo"), "win.redo")
+    item {
+      label: _("_Undo");
+      action: "win.undo";
+      accel: "<Control>z";
+    }
+    item {
+      label: _("_Redo");
+      action: "win.redo";
+      accel: "<Control><Shift>z";
+    }
   }
 
   section {
     item (_("Ad_just Size…"), "win.adjust-size")
     item (_("_Crop to Selection"), "win.crop")
-    item (_("Select _All"), "win.select-all")
+    item {
+      label: _("Select _All");
+      action: "win.select-all";
+      accel: "<Control>a";
+    }
 
     submenu {
       label: _("Selection _Ratio");

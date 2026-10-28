@@ -386,12 +386,15 @@ class Canvas(Gtk.Widget):
             name = None
         self.set_cursor_from_name(name)
 
-    def _on_key(self, _controller, keyval, _keycode, _state):
+    def _on_key(self, _controller, keyval, _keycode, state):
         if keyval == Gdk.KEY_Escape and self.selection:
             self.set_selection(None)
             return True
         if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter) and self.selection:
             self.activate_action("win.crop", None)
+            return True
+        if keyval in (Gdk.KEY_Left, Gdk.KEY_Right) and not state & Gdk.ModifierType.MODIFIER_MASK:
+            self.activate_action("win.previous" if keyval == Gdk.KEY_Left else "win.next", None)
             return True
         return False
 

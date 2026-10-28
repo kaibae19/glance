@@ -3,7 +3,7 @@ import threading
 
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
-from . import imageio
+from . import imageio, shortcuts
 from .adjust_size import AdjustSizeDialog
 from .canvas import Canvas  # noqa: F401  registers GlanceCanvas for the template
 from .document import AnimatedImageError, Document
@@ -32,6 +32,7 @@ class GlanceWindow(Adw.ApplicationWindow):
         self._overwrite_ok = False  # the user confirmed saving over this document's original
         self._closing = False
         self._add_actions()
+        shortcuts.install_window(self)
 
         drop = Gtk.DropTarget.new(Gdk.FileList, Gdk.DragAction.COPY)
         drop.connect("drop", self._on_drop)
