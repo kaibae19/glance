@@ -2,7 +2,7 @@
 """Drive the installed app: v0.3 acceptance (open a 1024² icon, Adjust Size to 400 by typing, Enter, Save,
 Replace) and v0.4 crop (drag, crop, undo, 1:1 ratio, click to clear, select all) and v0.5 export (sheet rows per
 format, JPEG flattened onto white with EXIF stripped, document untouched) and v0.6 markup (draw, move, recolour, delete,
-undo, save flattened). Not collected by pytest; run with scripts/ui-smoke (needs a display).
+undo, save flattened, text formatting) and v1.0 (GSettings, shortcuts and About dialogs, window size). Not collected by pytest; run with scripts/ui-smoke (needs a display).
 
 Usage: ui_smoke.py PKGDATADIR WORKDIR
 """
@@ -13,6 +13,7 @@ import time
 
 pkgdatadir, workdir = sys.argv[1:3]
 sys.path.insert(1, pkgdatadir)
+os.environ["GSETTINGS_SCHEMA_DIR"] = os.path.join(pkgdatadir, "..", "glib-2.0", "schemas")  # as the launcher does
 
 import gi  # noqa: E402
 
@@ -352,7 +353,49 @@ def markup_save(win):
           and text_px[0] < 100 and not doc.dirty and doc.open_markup is not None)
     step(f"after save: still editable {doc.open_markup is not None}, dirty {doc.dirty}")
     result["ok"] = result["ok"] and ok and result.pop("markup_ok")
+    v1_start(win)
+
+
+# --- v1.0 settings, shortcuts, about -----------------------------------------------------------
+
+def v1_start(win):
+    from glance import settings as glance_settings
+    s = app.settings
+    saved = glance_settings.load_export(s)
+    step(f"settings {'on' if s else 'MISSING'}; saved export {saved}")
+    ok = s is not None and saved is not None and saved.format == "JPEG" and saved.quality == 60 and saved.strip_metadata
+    result["v1_ok"] = ok
+    win.activate_action("win.shortcuts", None)
+    wait(lambda: win.get_visible_dialog() is not None, lambda: v1_shortcuts(win))
+
+
+def v1_shortcuts(win):
+    dialog = win.get_visible_dialog()
+    step(f"shortcuts dialog {type(dialog).__name__}")
+    result["v1_ok"] = result["v1_ok"] and type(dialog).__name__ == "ShortcutsDialog"
+    GLib.timeout_add(300, lambda: v1_about(win, dialog))
+
+
+def v1_about(win, shortcuts_dialog):
+    shoot(win, "shortcuts.png")
+    shortcuts_dialog.force_close()
+    app.activate_action("about", None)
+    wait(lambda: win.get_visible_dialog() is not None, lambda: GLib.timeout_add(300, lambda: v1_done(win)))
+
+
+def v1_done(win):
+    about = win.get_visible_dialog()
+    step(f"about: {about.get_application_name()} {about.get_version()}, license {about.get_license_type().value_nick}, "
+         f"icon {about.get_application_icon()}, icon found {Gtk.IconTheme.get_for_display(win.get_display()).has_icon(about.get_application_icon())}")
+    ok = (about.get_version() == "smoke" and about.get_license_type() == Gtk.License.GPL_3_0
+          and Gtk.IconTheme.get_for_display(win.get_display()).has_icon("io.github.kaibae19.Glance"))
+    shoot(win, "about.png")
+    about.force_close()
+    win.set_default_size(1000, 700)
     win.close()
+    w, h = app.settings.get_int("window-width"), app.settings.get_int("window-height")
+    step(f"window size saved {w}×{h}")
+    result["ok"] = result["ok"] and ok and result.pop("v1_ok") and (w, h) == (1000, 700)
     app.quit()
 
 
