@@ -2,3 +2,6 @@ _build/
 _install/
 __pycache__/
 .pytest_cache/
+.flatpak-builder/
+flatpak-build/
+flatpak-repo/

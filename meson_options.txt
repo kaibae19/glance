@@ -1,0 +1,1 @@
+option('tests', type: 'boolean', value: true, description: 'Register the test suite (needs pytest; off in the Flatpak)')

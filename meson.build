@@ -9,8 +9,10 @@ subdir('data')
 subdir('src/glance')
 subdir('bin')
 
-test('unit', py, args: ['-m', 'pytest', '-q', meson.project_source_root() / 'tests'],
-     workdir: meson.project_source_root())
+if get_option('tests')
+  test('unit', py, args: ['-m', 'pytest', '-q', meson.project_source_root() / 'tests'],
+       workdir: meson.project_source_root())
+endif
 
 gnome.post_install(
   glib_compile_schemas: true,
