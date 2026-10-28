@@ -89,7 +89,10 @@ def opened(win):
 
 def dialog_up(win):
     dialog = win.get_visible_dialog()
-    step(f"dialog {type(dialog).__name__}")
+    cw, ch = win.canvas.get_width(), win.canvas.get_height()
+    step(f"dialog {type(dialog).__name__}; window fitted to the 1024² icon: {win.get_width()}×{win.get_height()}, "
+         f"canvas {cw}×{ch}, zoom {win.canvas.zoom:.2f}")
+    result["fit_ok"] = abs(cw - ch) <= 2 and win.get_width() < 960  # square canvas for a square image
     dialog.width_row.set_text("400")  # what typing does: the editable's text changes
     step(f"typed 400 -> model {dialog.model.size()}, height row {dialog.height_row.get_text()}")
     wait(lambda: "about" in (dialog.result_row.get_subtitle() or ""), lambda: estimated(win, dialog))
@@ -139,7 +142,9 @@ def saved(win):
 
 def crop_start(win):
     canvas = win.canvas
-    step(f"opened photo {win.document.size}, crop enabled: {win.lookup_action('crop').get_enabled()}")
+    step(f"opened photo {win.document.size}, crop enabled: {win.lookup_action('crop').get_enabled()}; "
+         f"window {win.get_width()}×{win.get_height()}, canvas {canvas.get_width()}×{canvas.get_height()}")
+    result["fit_ok"] = result["fit_ok"] and abs(canvas.get_width() / canvas.get_height() - 1.6) < 0.02
     x0, y0 = canvas.to_widget(200, 100)
     x1, y1 = canvas.to_widget(1000, 700)
     canvas.begin_drag(x0, y0)
@@ -395,7 +400,7 @@ def v1_done(win):
     win.close()
     w, h = app.settings.get_int("window-width"), app.settings.get_int("window-height")
     step(f"window size saved {w}×{h}")
-    result["ok"] = result["ok"] and ok and result.pop("v1_ok") and (w, h) == (1000, 700)
+    result["ok"] = result["ok"] and ok and result.pop("v1_ok") and (w, h) == (1000, 700) and result.pop("fit_ok")
     app.quit()
 
 

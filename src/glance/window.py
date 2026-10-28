@@ -13,6 +13,11 @@ from .canvas import Canvas  # noqa: F401  registers GlanceCanvas for the templat
 from .document import AnimatedImageError, Document
 from .ops import Crop, Flip, Rotate
 
+# Fitting the window to a newly opened image, as Preview does: at most this much of the monitor (room for
+# GNOME's top bar and dock), and at least big enough for the header bar's buttons.
+FIT_SCREEN_W, FIT_SCREEN_H = 0.9, 0.85
+FIT_MIN_W, FIT_MIN_H = 520, 360
+
 DOC_ACTIONS = ["save", "save-as", "export", "markup", "markup-tool", "markup-color", "markup-weight",
                "adjust-size", "crop", "select-all", "zoom-in", "zoom-out", "zoom-actual", "zoom-fit", "rotate-left",
                "rotate-right", "flip-horizontal", "flip-vertical", "previous", "next", "info"]
@@ -41,6 +46,7 @@ class GlanceWindow(Adw.ApplicationWindow):
         self.document = None
         self._siblings = []
         self._load_seq = 0
+        self._fit_on_load = False
         self._overwrite_ok = False  # the user confirmed saving over this document's original
         self._closing = False
         self._add_actions()
@@ -325,11 +331,13 @@ class GlanceWindow(Adw.ApplicationWindow):
         if path is None:
             self.toast("Glance can only open local files")
             return
-        self._confirm_discard(lambda: self._load(path))
+        self._confirm_discard(lambda: self._load(path, fit_window=True))
 
-    def _load(self, path):
+    def _load(self, path, fit_window=False):
+        """Open path in the background. fit_window: size the window to the image (a new open, not Left/Right)."""
         self._load_seq += 1
         seq = self._load_seq
+        self._fit_on_load = fit_window
 
         def work():
             try:
@@ -358,7 +366,35 @@ class GlanceWindow(Adw.ApplicationWindow):
         self.canvas.grab_focus()
         self._fill_info()
         self._update_state()
+        if self._fit_on_load:
+            self._fit_window_to(doc.size)
         return False
+
+    def _fit_window_to(self, size):
+        """Resize the window so the image shows at 100%, or as large as fits on the monitor."""
+        if self.is_maximized() or self.is_fullscreen():
+            return
+        if not self.get_mapped():
+            handler = []
+            handler.append(self.connect("map", lambda *_: (self.disconnect(handler[0]), self._fit_window_to(size))))
+            return
+        display, surface = self.get_display(), self.get_surface()
+        monitor = display.get_monitor_at_surface(surface) if surface else None
+        if monitor is None and display.get_monitors().get_n_items():
+            monitor = display.get_monitors().get_item(0)
+        if monitor is None:
+            return
+        area = monitor.get_geometry()  # logical px; GTK has no work area on Wayland
+        scale = surface.get_scale() if surface else monitor.get_scale()
+        # Everything around the image: header bar, markup bar (when shown), borders.
+        chrome_w = max(0, self.get_width() - self.stack.get_width())
+        chrome_h = max(0, self.get_height() - self.stack.get_height())
+        room_w = area.width * FIT_SCREEN_W - chrome_w
+        room_h = area.height * FIT_SCREEN_H - chrome_h
+        iw, ih = size[0] / scale, size[1] / scale  # 100% = one image px per device px, as in the canvas
+        k = min(1.0, room_w / iw, room_h / ih)
+        self.set_default_size(max(FIT_MIN_W, round(iw * k + chrome_w)), max(FIT_MIN_H, round(ih * k + chrome_h)))
+        self.canvas.zoom_fit()
 
     def _sibling_index(self):
         if not self.document or self.document.path not in self._siblings:
