@@ -1,0 +1,15 @@
+#!@PYTHON@
+import os
+import signal
+import sys
+
+pkgdatadir = '@pkgdatadir@'
+sys.path.insert(1, pkgdatadir)
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+if __name__ == '__main__':
+    from gi.repository import Gio
+    Gio.Resource.load(os.path.join(pkgdatadir, 'glance.gresource'))._register()
+
+    from glance import main
+    sys.exit(main.main('@VERSION@'))

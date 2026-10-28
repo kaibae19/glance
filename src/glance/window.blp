@@ -1,0 +1,136 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $GlanceWindow: Adw.ApplicationWindow {
+  default-width: 960;
+  default-height: 680;
+  title: _("Glance");
+
+  content: Adw.ToastOverlay toast_overlay {
+    child: Adw.ToolbarView {
+      [top]
+      Adw.HeaderBar {
+        [start]
+        Button {
+          icon-name: "document-open-symbolic";
+          tooltip-text: _("Open…");
+          action-name: "win.open";
+        }
+
+        title-widget: Adw.WindowTitle window_title {
+          title: _("Glance");
+        };
+
+        [end]
+        MenuButton {
+          primary: true;
+          icon-name: "open-menu-symbolic";
+          tooltip-text: _("Main Menu");
+          menu-model: primary_menu;
+        }
+
+        [end]
+        Button {
+          icon-name: "object-rotate-left-symbolic";
+          tooltip-text: _("Rotate Left");
+          action-name: "win.rotate-left";
+        }
+
+        [end]
+        Box {
+          styles [
+            "linked",
+          ]
+
+          Button {
+            icon-name: "zoom-out-symbolic";
+            tooltip-text: _("Zoom Out");
+            action-name: "win.zoom-out";
+          }
+
+          Button {
+            icon-name: "zoom-in-symbolic";
+            tooltip-text: _("Zoom In");
+            action-name: "win.zoom-in";
+          }
+        }
+
+        [end]
+        MenuButton info_button {
+          icon-name: "help-about-symbolic";
+          tooltip-text: _("Info");
+
+          popover: Popover {
+            child: Grid info_grid {
+              row-spacing: 6;
+              column-spacing: 12;
+              margin-top: 6;
+              margin-bottom: 6;
+              margin-start: 6;
+              margin-end: 6;
+            };
+          };
+        }
+      }
+
+      content: Stack stack {
+        StackPage {
+          name: "empty";
+
+          child: Adw.StatusPage {
+            icon-name: "image-x-generic-symbolic";
+            title: _("No Image Open");
+            description: _("Drag an image here, or open one");
+
+            child: Button {
+              label: _("_Open…");
+              use-underline: true;
+              halign: center;
+              action-name: "win.open";
+
+              styles [
+                "pill",
+                "suggested-action",
+              ]
+            };
+          };
+        }
+
+        StackPage {
+          name: "image";
+          child: $GlanceCanvas canvas {};
+        }
+      };
+    };
+  };
+}
+
+menu primary_menu {
+  section {
+    item (_("_Open…"), "win.open")
+    item (_("_Save"), "win.save")
+    item (_("Save _As…"), "win.save-as")
+  }
+
+  section {
+    item (_("_Undo"), "win.undo")
+    item (_("_Redo"), "win.redo")
+  }
+
+  section {
+    item (_("Rotate _Left"), "win.rotate-left")
+    item (_("Rotate _Right"), "win.rotate-right")
+    item (_("Flip _Horizontal"), "win.flip-horizontal")
+    item (_("Flip _Vertical"), "win.flip-vertical")
+  }
+
+  section {
+    item (_("Actual _Size"), "win.zoom-actual")
+    item (_("Zoom to _Fit"), "win.zoom-fit")
+    item (_("_Full Screen"), "win.fullscreen")
+  }
+
+  section {
+    item (_("_About Glance"), "app.about")
+  }
+}

@@ -1,0 +1,7 @@
+#!/bin/sh
+# Build into ./_build, install into ./_install, run. Usage: scripts/dev [image…]
+set -e
+cd "$(dirname "$0")/.."
+[ -d _build ] || meson setup _build --prefix="$PWD/_install"
+meson install -C _build --quiet
+exec _install/bin/glance "$@"
