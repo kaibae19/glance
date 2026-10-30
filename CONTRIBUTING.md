@@ -51,8 +51,8 @@ description. Pull requests that look generated and untested will be closed.
 
 ## Conduct
 
-Be kind and assume good faith. Harassment and personal attacks aren't tolerated in issues, pull requests or any other
-project space. The maintainer may edit or remove comments and block anyone who doesn't follow this.
+Everyone taking part in Glance is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md) (Contributor Covenant 2.1).
+It also says how to report a problem privately.
 
 ## Security
 

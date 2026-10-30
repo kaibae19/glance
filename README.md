@@ -85,7 +85,7 @@ with pytest coverage that runs headless. The UI can be checked without a desktop
 
 Design notes and the reasoning behind the choices: [`docs/design.md`](docs/design.md).
 
-Contributions are welcome: see [`CONTRIBUTING.md`](CONTRIBUTING.md). Security reports: [`SECURITY.md`](SECURITY.md).
+Contributions are welcome: see [`CONTRIBUTING.md`](CONTRIBUTING.md). Security reports: [`SECURITY.md`](SECURITY.md). Code of conduct: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
 
 ## Status
 
