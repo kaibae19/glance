@@ -53,7 +53,7 @@ It's a different category, so it's fine as a working name, but check again befor
 | **Info** | Side panel or popover: dimensions, format, file size, colour mode, DPI, EXIF summary. |
 
 **Save semantics (Preview-like but safer):** Ctrl+S overwrites the original in its own format after the
-first-time confirmation; Shift+Ctrl+S is Export As. Closing with unsaved operations asks. No auto-save in v1.
+first-time confirmation; Shift+Ctrl+S is Save As (Shift+Ctrl+Alt+S, Preview's chord, works too). Export has no shortcut. Closing with unsaved operations asks. No auto-save in v1.
 
 ## 4. Architecture
 
@@ -129,7 +129,8 @@ sidebar (`Adw.OverlaySplitView`). Errors and confirmations ("Saved", "Exported a
 |---|---|---|
 | Open | Ctrl+O | ⌘O |
 | Save | Ctrl+S | ⌘S |
-| Export As | Shift+Ctrl+S | File → Export |
+| Save As | Shift+Ctrl+S (also Shift+Ctrl+Alt+S) | ⌥⇧⌘S |
+| Export | none | File → Export |
 | Undo / Redo | Ctrl+Z / Shift+Ctrl+Z | ⌘Z / ⇧⌘Z |
 | Zoom in / out | Ctrl+= / Ctrl+− (and Ctrl+scroll, pinch) | ⌘+ / ⌘− |
 | Actual size | Ctrl+0 | ⌘0 |

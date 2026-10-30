@@ -12,7 +12,7 @@ from gi.repository import Adw, Gtk
 APP = {
     "win.open": ["<Control>o"],
     "win.save": ["<Control>s"],
-    "win.save-as": ["<Control><Shift><Alt>s", "<Control><Shift>s"],  # Preview ⌥⇧⌘S; ⇧ alone is the GNOME habit
+    "win.save-as": ["<Control><Shift>s", "<Control><Shift><Alt>s"],  # GNOME habit first (menus show only the first); Preview ⌥⇧⌘S too
     "win.close": ["<Control>w"],
     "app.quit": ["<Control>q"],
     "win.zoom-in": ["<Control>equal", "<Control>plus", "<Control>KP_Add"],

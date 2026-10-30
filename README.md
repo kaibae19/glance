@@ -30,7 +30,7 @@ Preview's shortcuts, with ⌘ as Ctrl:
 
 | | |
 |---|---|
-| Open / Save / Save As | Ctrl+O / Ctrl+S / Ctrl+Shift+S |
+| Open / Save / Save As | Ctrl+O / Ctrl+S / Ctrl+Shift+S (Preview's Ctrl+Shift+Alt+S works too) |
 | Undo / Redo | Ctrl+Z / Ctrl+Shift+Z |
 | Zoom in / out / actual size / fit | Ctrl+= / Ctrl+− / Ctrl+0 / Ctrl+9 |
 | Rotate left / right | Ctrl+L / Ctrl+R |
