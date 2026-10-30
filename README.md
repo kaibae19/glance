@@ -44,7 +44,15 @@ Mouse: drag to select (Shift for a square), drag the handles to adjust; scroll o
 
 ## Install
 
-Glance isn't on Flathub yet. To build and install the Flatpak from this repository (GNOME 51 runtime):
+Glance isn't on Flathub yet. The easiest way is the Flatpak bundle (x86_64) from the
+[latest release](https://github.com/kaibae19/glance/releases/latest):
+
+    flatpak install --user Glance-1.0.0-x86_64.flatpak
+    flatpak run io.github.kaibae19.Glance
+
+It fetches the GNOME 51 runtime from Flathub if needed. A bundle doesn't update itself, so install each new release the same way.
+
+To build and install the Flatpak from this repository instead (GNOME 51 runtime):
 
     flatpak install --user flathub org.gnome.Sdk//51 org.gnome.Platform//51
     flatpak-builder --user --install --force-clean flatpak-build io.github.kaibae19.Glance.json
