@@ -65,6 +65,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.0.2" date="2026-10-30" type="stable" urgency="high">
+      <description>
+        <p>Security update: the bundled Pillow image library is updated from 12.1.1 to 13.0.0, which fixes known vulnerabilities in reading crafted image files. No other changes.</p>
+      </description>
+    </release>
     <release version="1.0.1" date="2026-10-29">
       <description>
         <p>New app ID, io.github.kaibae19.Glance, in preparation for Flathub. No other changes. Settings from 1.0.0 are not carried over.</p>
