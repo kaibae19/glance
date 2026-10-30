@@ -44,14 +44,17 @@ Mouse: drag to select (Shift for a square), drag the handles to adjust; scroll o
 
 ## Install
 
-Glance isn't on Flathub yet. The easiest way is the Flatpak bundle (x86_64): download
-`Glance-<version>-x86_64.flatpak` from the [latest release](https://github.com/kaibae19/glance/releases/latest), then, in the
-folder you saved it to:
+Install from my signed Flatpak repository (x86_64); updates then arrive through `flatpak update` or GNOME Software:
 
-    flatpak install --user Glance-*-x86_64.flatpak
+    flatpak install --user https://kaibae19.github.io/flatpak/glance.flatpakref
     flatpak run io.github.kaibae19.Glance
 
-It fetches the GNOME 51 runtime from Flathub if needed. A bundle doesn't update itself, so install each new release the same way.
+It fetches the GNOME 51 runtime from Flathub if needed. The signing key and its fingerprint are in
+[kaibae19/flatpak](https://github.com/kaibae19/flatpak).
+
+Prefer a single file? Each [release](https://github.com/kaibae19/glance/releases/latest) also has a Flatpak bundle,
+`Glance-<version>-x86_64.flatpak`: `flatpak install --user Glance-*-x86_64.flatpak`. A bundle doesn't update itself,
+so install each new release the same way.
 
 To build and install the Flatpak from this repository instead (GNOME 51 runtime):
 
