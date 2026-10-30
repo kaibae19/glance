@@ -85,6 +85,8 @@ with pytest coverage that runs headless. The UI can be checked without a desktop
 
 Design notes and the reasoning behind the choices: [`docs/design.md`](docs/design.md).
 
+Contributions are welcome: see [`CONTRIBUTING.md`](CONTRIBUTING.md). Security reports: [`SECURITY.md`](SECURITY.md).
+
 ## Status
 
 1.0 covers images; PDF support is new (viewing and page operations). Not there yet: finding and selecting text in

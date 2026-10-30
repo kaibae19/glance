@@ -1,0 +1,24 @@
+name: Feature idea
+description: Suggest something Glance should do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Glance aims to be Preview for GNOME, built for quick, common edits. Layers, filters, painting and batch pipelines are out of scope (`docs/design.md` § 1).
+  - type: textarea
+    id: need
+    attributes:
+      label: What are you trying to do?
+      description: The task, not the solution. How does Preview (or another app) handle it, if you know?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like Glance to do?
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: Contributing
+      options:
+        - label: I'd like to work on this myself
