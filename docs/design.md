@@ -244,7 +244,7 @@ folder in GNOME Builder and press Run.
 - [ ] **UI definition:** Blueprint (`.blp`, terser) or plain GtkBuilder `.ui` XML?
 - [ ] **Annotation renderer:** Pillow `ImageDraw` (one engine, simpler) or Cairo (nicer antialiased text and
       arrows, but premultiplied-alpha conversion)?
-- [x] **App ID** `io.github.kaibae19.Glance` (in use since v1.0).
+- [x] **App ID** `io.github.kaibae19.Glance` (since 1.0.1, for Flathub).
 - [x] **Dev platform:** Ubuntu 26.04 / GNOME 50 (libadwaita ≥ 1.5 needed).
 
 ## 10. Status (2026-10-29)
