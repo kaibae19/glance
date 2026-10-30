@@ -15,3 +15,8 @@ credit to you if you want it.
 ## Supported versions
 
 Only the latest release and `main` get fixes.
+
+## Scans
+
+Each release is checked for known vulnerabilities in the bundled libraries, for secrets in the history, and with
+Flathub's linter. How to run the scans and the latest results: [docs/security-scans.md](docs/security-scans.md).
